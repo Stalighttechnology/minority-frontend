@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger, PopoverArrow } from "../ui/pop
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { translateTerminology } from "../../utils/institutionConfig";
 import { AddCollegeModal } from "../org_admin/AddCollegeModal";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 interface User {
   username: string;
@@ -633,7 +634,7 @@ const Navbar = ({ role, user, onNotificationClick, setPage, showHamburger = fals
                     className="w-full flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold rounded-lg text-primary hover:bg-primary/10 transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Add College / Institution
+                    Add School / Institution
                   </button>
                 </div>
               </div>
@@ -662,6 +663,8 @@ const Navbar = ({ role, user, onNotificationClick, setPage, showHamburger = fals
           >
             {theme === 'dark' ? <FiSun size={18} /> : <FiMoon size={18} />}
           </Button>
+
+          <LanguageSwitcher />
 
           {['student', 'parent', 'faculty', 'hod', 'admin', 'principal', 'coe', 'dean', 'hms', 'hms_admin', 'fees_manager', 'transport_admin', 'org_admin', 'warden', 'driver', 'library_admin', 'admission_manager', 'counsellor'].includes(role || '') && (
             <Popover open={isNotificationsOpen} onOpenChange={(open) => { setIsNotificationsOpen(open); if (open) markNotificationsRead(); }}>

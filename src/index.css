@@ -2,6 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Suppress all Google Translate banners, loading animations, spinners, and tooltips */
+.goog-te-banner-frame,
+.goog-te-banner-frame.skiptranslate,
+iframe.goog-te-banner-frame,
+.goog-te-balloon-frame,
+#goog-gt-tt,
+.goog-tooltip,
+.goog-tooltip:hover,
+.goog-te-spinner-pos,
+.goog-te-spinner,
+.VIpgJd-yAWneb-hvhGLb-SnMDfe,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+.VIpgJd-ZVi9od-ORHb-OEVmcb,
+#google_translate_element,
+.skiptranslate,
+.skiptranslate.goog-te-gadget {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+body {
+  top: 0px !important;
+  position: static !important;
+}
+
+.goog-text-highlight {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
 @layer base {
   :root {
     --safe-area-inset-top: 0px;

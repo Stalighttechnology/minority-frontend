@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import ScheduledLocationTracker from "./components/faculty/ScheduledLocationTracker";
 import { useVersionControl } from "./hooks/useVersionControl";
 import { MandatoryUpdateScreen } from "./components/common/MandatoryUpdateScreen";
+import { initLanguageEngine } from "./utils/languageManager";
 
 // Lazy loaded components
 const NotFound = lazy(() => import("./components/common/NotFound"));
@@ -173,6 +174,7 @@ const AppContent = () => {
 
   useEffect(() => {
     initErrorLogger();
+    initLanguageEngine();
     let backListenerPromise: Promise<any> | null = null;
 
     // Handle browser/webview popstate (history back) navigation
