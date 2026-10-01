@@ -819,13 +819,13 @@ const AdminAnnouncementManagement = () => {
                               <SelectValue placeholder="Select Category" />
                             </SelectTrigger>
                             <SelectContent className={theme === 'dark' ? 'bg-card border-border text-foreground' : 'bg-white text-gray-900'}>
-                              <SelectItem value="vtu" className="text-xs">VTU Circular</SelectItem>
-                              <SelectItem value="university" className="text-xs">University Notification</SelectItem>
-                              <SelectItem value="exam" className="text-xs">Examination</SelectItem>
-                              <SelectItem value="academic" className="text-xs">Academic Calendar</SelectItem>
-                              <SelectItem value="govt" className="text-xs">Government / AICTE</SelectItem>
-                              <SelectItem value="internal" className="text-xs">Internal / Office Order</SelectItem>
-                              <SelectItem value="general" className="text-xs">General Circular</SelectItem>
+                              <SelectItem value="board" className="text-xs">Board Circular (CBSE / ICSE / State)</SelectItem>
+                              <SelectItem value="vtu" className="text-xs">Board Circular</SelectItem>
+                              <SelectItem value="govt" className="text-xs">Education Dept / Govt Order</SelectItem>
+                              <SelectItem value="exam" className="text-xs">Examination / Term Assessment</SelectItem>
+                              <SelectItem value="academic" className="text-xs">Academic Calendar & Events</SelectItem>
+                              <SelectItem value="internal" className="text-xs">School Office Order</SelectItem>
+                              <SelectItem value="general" className="text-xs">General School Circular</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

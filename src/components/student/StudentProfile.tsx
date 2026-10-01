@@ -1110,7 +1110,7 @@ const StudentProfile: React.FC = () => {
                         <Input name="last_name" value={form.last_name} readOnly className={getInputClassName(false)} />
                       </div>
                       <div>
-                        <Label className={`text-[16px] sm:text-sm ${theme === 'dark' ? 'text-foreground' : 'text-gray-700'}`}>USN</Label>
+                        <Label className={`text-[16px] sm:text-sm ${theme === 'dark' ? 'text-foreground' : 'text-gray-700'}`}>Roll No / Admission No</Label>
                         <Input name="usn" value={form.usn} readOnly className={getInputClassName(false)} />
                       </div>
                       <div>

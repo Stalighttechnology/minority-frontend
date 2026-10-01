@@ -69,10 +69,10 @@ export const CollegeReportCardModal: React.FC<CollegeReportCardModalProps> = ({
             </div>
             <div>
               <DialogTitle className="text-sm sm:text-base font-bold text-foreground leading-tight">
-                Institutional College Report Card
+                Institutional School Report Card
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                Official Institutional Profile & Compliance Report (AICTE / AISHE / NAAC / University)
+                Official Institutional Profile & Compliance Report (Affiliation Board / AISHE / State Education Dept)
               </DialogDescription>
             </div>
           </div>
@@ -108,7 +108,7 @@ export const CollegeReportCardModal: React.FC<CollegeReportCardModalProps> = ({
                 <div className="w-16 h-16 flex items-center justify-center">
                   <img
                     src={data.org_logo || "/logo.jpeg"}
-                    alt={data.college_name || data.org_name || "College Logo"}
+                    alt={data.college_name || data.org_name || "School Logo"}
                     className="max-w-full max-h-full object-contain"
                   />
                 </div>
@@ -130,20 +130,20 @@ export const CollegeReportCardModal: React.FC<CollegeReportCardModalProps> = ({
               </div>
 
               <div className="flex items-center justify-between bg-neutral-100 border border-black px-3 py-1 mt-2.5 font-sans font-bold text-[12px]">
-                <span>COLLEGE REPORT CARD</span>
+                <span>SCHOOL REPORT CARD</span>
                 <span>STATUS: ACTIVE & VERIFIED</span>
               </div>
             </div>
 
-            {/* 1. College Profile Details */}
+            {/* 1. School Profile Details */}
             <div className="report-section mb-3">
               <div className="font-bold uppercase text-[11px] border-b border-black pb-0.5 mb-1 bg-neutral-200 px-1 font-sans">
-                1. College Profile Details
+                1. School Profile Details
               </div>
               <table className="w-full border-collapse border border-black text-[10px]">
                 <tbody>
                   <tr className="border-b border-black">
-                    <td className="border-r border-black p-1 font-bold bg-neutral-50 w-28">College Code</td>
+                    <td className="border-r border-black p-1 font-bold bg-neutral-50 w-28">School Code</td>
                     <td className="border-r border-black p-1 w-44">{displayVal(data.college_code)}</td>
                     <td className="border-r border-black p-1 font-bold bg-neutral-50 w-28">AISHE Code</td>
                     <td className="p-1">{displayVal(data.aishe_code)}</td>

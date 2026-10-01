@@ -111,20 +111,20 @@ const getPriorityIcon = (priority: string) => {
 
 const getCircularCategoryBadge = (category?: string | null) => {
   switch (category) {
+    case 'board':
     case 'vtu':
-      return { label: 'VTU Circular', className: 'bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 border-purple-300 dark:border-purple-800' };
+      return { label: 'Board Circular', className: 'bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 border-purple-300 dark:border-purple-800' };
     case 'university':
-      return { label: 'University Notice', className: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800' };
+    case 'govt':
+      return { label: 'Education Dept / Govt Order', className: 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border-amber-300 dark:border-amber-800' };
     case 'exam':
-      return { label: 'Exam / COE Notice', className: 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border-blue-300 dark:border-blue-800' };
+      return { label: 'Exam / Assessment Notice', className: 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border-blue-300 dark:border-blue-800' };
     case 'academic':
       return { label: 'Academic Calendar', className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800' };
-    case 'govt':
-      return { label: 'Govt / AICTE', className: 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border-amber-300 dark:border-amber-800' };
     case 'internal':
-      return { label: 'Internal Circular', className: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300 border-cyan-300 dark:border-cyan-800' };
+      return { label: 'School Office Order', className: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300 border-cyan-300 dark:border-cyan-800' };
     default:
-      return { label: 'Official Circular', className: 'bg-primary/10 text-primary border-primary/30' };
+      return { label: 'School Circular', className: 'bg-primary/10 text-primary border-primary/30' };
   }
 };
 
@@ -543,12 +543,12 @@ export const AnnouncementSections = ({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Circular Categories</SelectItem>
-                      <SelectItem value="vtu">VTU Circular</SelectItem>
-                      <SelectItem value="university">University Notification</SelectItem>
-                      <SelectItem value="exam">Examination / COE</SelectItem>
+                      <SelectItem value="board">Board Circular (CBSE / ICSE / State)</SelectItem>
+                      <SelectItem value="vtu">Board Circular</SelectItem>
+                      <SelectItem value="govt">Education Dept / Govt Order</SelectItem>
+                      <SelectItem value="exam">Examination / Term Assessment</SelectItem>
                       <SelectItem value="academic">Academic Calendar</SelectItem>
-                      <SelectItem value="govt">Government / AICTE</SelectItem>
-                      <SelectItem value="internal">Internal Orders</SelectItem>
+                      <SelectItem value="internal">School Orders</SelectItem>
                       <SelectItem value="general">General Circular</SelectItem>
                     </SelectContent>
                   </Select>

@@ -215,11 +215,11 @@ export const CollegeDetailsPage: React.FC<CollegeDetailsPageProps> = ({
 
     // 1. Profile Validations
     if (!formData.college_name?.trim()) {
-      errors.push("College / Institutional Name is required");
+      errors.push("School / Institution Name is required");
       if (!firstErrorTab) firstErrorTab = "profile";
     }
     if (!formData.college_code?.trim()) {
-      errors.push("College Code is required");
+      errors.push("School / Institution Code is required");
       if (!firstErrorTab) firstErrorTab = "profile";
     }
     if (!formData.aishe_code?.trim()) {

@@ -1,11 +1,13 @@
 import * as React from "react";
-export type InstitutionType = 'engineering' | 'medical' | 'school';
+export type InstitutionType = 'school' | 'engineering' | 'medical';
 
 interface InstitutionTerminology {
   branch: string;
   branches: string;
   semester: string;
   semesters: string;
+  section: string;
+  sections: string;
   hod: string;
   usn: string;
   coAttainment: string;
@@ -18,97 +20,54 @@ interface InstitutionTerminology {
   activeBranches: string;
   acrossBranches: string;
   coordinators: string;
+  institution: string;
+  institutionProfile: string;
 }
 
+const SCHOOL_TERMINOLOGY: InstitutionTerminology = {
+  branch: 'Stream',
+  branches: 'Streams',
+  semester: 'Class',
+  semesters: 'Classes',
+  section: 'Section',
+  sections: 'Sections',
+  hod: 'Academic Coordinator',
+  usn: 'Roll No',
+  coAttainment: 'Learning Outcomes',
+  labs: 'Practicals',
+  electives: 'Optional Subjects',
+  proctor: 'Class Teacher',
+  mentoring: 'Mentorship',
+  admin: 'School Admin',
+  admins: 'School Admins',
+  activeBranches: 'Active Streams',
+  acrossBranches: 'Across Streams',
+  coordinators: 'Academic Coordinators',
+  institution: 'School',
+  institutionProfile: 'School Profile',
+};
+
 const TERMINOLOGY_MAP: Record<InstitutionType, InstitutionTerminology> = {
-  engineering: {
-    branch: 'Branch',
-    branches: 'Branches',
-    semester: 'Semester',
-    semesters: 'Semesters',
-    hod: 'Head of Department',
-    usn: 'USN',
-    coAttainment: 'CO Attainment',
-    labs: 'Labs',
-    electives: 'Electives',
-    proctor: 'Proctor',
-    mentoring: 'Mentoring',
-    admin: 'Admin',
-    admins: 'Admins',
-    activeBranches: 'Active branches',
-    acrossBranches: 'Across branches',
-    coordinators: 'Dept heads',
-  },
-  medical: {
-    branch: 'Course',
-    branches: 'Courses',
-    semester: 'Year/Phase',
-    semesters: 'Years/Phases',
-    hod: 'HOD',
-    usn: 'USN',
-    coAttainment: 'Competency',
-    labs: 'Clinical Postings',
-    electives: 'Electives',
-    proctor: 'Mentor',
-    admin: 'Admin',
-    admins: 'Admins',
-    activeBranches: 'Active courses',
-    acrossBranches: 'Across courses',
-    coordinators: 'Dept heads',
-  },
-  school: {
-    branch: 'Stream',
-    branches: 'Streams',
-    semester: 'Class',
-    semesters: 'Classes',
-    hod: 'Coordinator',
-    usn: 'Roll No',
-    admin: 'Admin',
-    admins: 'Admins',
-    coAttainment: 'Learning Outcomes',
-    labs: 'Practicals',
-    electives: 'Optional Subjects',
-    proctor: 'Class Teacher',
-    mentoring: 'Guidance',
-    activeBranches: 'Active streams',
-    acrossBranches: 'Across streams',
-    coordinators: 'Coordinators',
-  }
+  school: SCHOOL_TERMINOLOGY,
+  engineering: SCHOOL_TERMINOLOGY,
+  medical: SCHOOL_TERMINOLOGY,
 };
 
 export const getInstitutionType = (): InstitutionType => {
-  try {
-    const userStr = sessionStorage.getItem('user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      return (user.org_institution_type || 'engineering') as InstitutionType;
-    }
-  } catch (e) {
-    console.error('Failed to parse user from session storage', e);
-  }
-  return 'engineering';
+  return 'school';
 };
 
-export const getTerminology = (type?: InstitutionType): InstitutionTerminology => {
-  const currentType = type || getInstitutionType();
-  return TERMINOLOGY_MAP[currentType] || TERMINOLOGY_MAP.engineering;
+export const getTerminology = (_type?: InstitutionType): InstitutionTerminology => {
+  return SCHOOL_TERMINOLOGY;
 };
 
-export const getTerm = (key: keyof InstitutionTerminology, type?: InstitutionType): string => {
-  return getTerminology(type)[key];
+export const getTerm = (key: keyof InstitutionTerminology, _type?: InstitutionType): string => {
+  return SCHOOL_TERMINOLOGY[key] || '';
 };
 
-export const hasFeature = (feature: 'labs' | 'electives' | 'coAttainment', type?: InstitutionType): boolean => {
-  const currentType = type || getInstitutionType();
-  if (currentType === 'school') {
-    if (feature === 'labs' || feature === 'coAttainment') {
-      return false; // Example: Schools might not use standard engineering lab/coAttainment features
-    }
-  }
-  if (currentType === 'medical') {
-    if (feature === 'coAttainment') {
-      return false; // Competency tracking is used, but CO attainment is engineering-specific
-    }
+export const hasFeature = (feature: 'labs' | 'electives' | 'coAttainment', _type?: InstitutionType): boolean => {
+  if (feature === 'coAttainment') {
+    return false;
   }
   return true;
 };
@@ -118,46 +77,64 @@ export const translateTerminology = (content: any): any => {
 
   let result = content;
   const replacements = [
+    { pattern: /\bBatch\s*\/\s*Branch\s*\/\s*Sem\b/gi, replacement: "Batch / Stream / Class" },
+    { pattern: /\bBatch\s*\/\s*Branch\s*\/\s*Semester\b/gi, replacement: "Batch / Stream / Class" },
+    { pattern: /\bBranch\s*\/\s*Sem\b/gi, replacement: "Stream / Class" },
+    { pattern: /\bBranch\s*\/\s*Semester\b/gi, replacement: "Stream / Class" },
+    { pattern: /\bHead of Branch\b/gi, replacement: "Academic Coordinator" },
     { pattern: /\bHead of Department\b/gi, key: "hod" },
     { pattern: /\bHeads of Departments\b/gi, key: "hod" },
     { pattern: /\bDept heads\b/gi, key: "hod" },
     { pattern: /\bDepartment heads\b/gi, key: "hod" },
-    { pattern: /\bHOD\b/gi, key: "hod" },
-    { pattern: /\bHODs\b/gi, key: "hod" },
+    { pattern: /\bHOD\b/g, key: "hod" },
+    { pattern: /\bHODs\b/g, key: "hod" },
     { pattern: /\bActive branches\b/gi, key: "activeBranches" },
     { pattern: /\bAcross branches\b/gi, key: "acrossBranches" },
     { pattern: /\bCoordinators\b/gi, key: "coordinators" },
+    { pattern: /\bCollege Profile\b/gi, replacement: "School Profile" },
+    { pattern: /\bCollege Details\b/gi, replacement: "School Details" },
+    { pattern: /\bCollege Report Card\b/gi, replacement: "School Report Card" },
+    { pattern: /\bCollege-Issued Items\b/gi, replacement: "School-Issued Items" },
+    { pattern: /\bEngineering College\b/gi, replacement: "School" },
+    { pattern: /\bMedical College\b/gi, replacement: "School" },
+    { pattern: /\bVTU Circular\b/gi, replacement: "Board Circular" },
+    { pattern: /\bUniversity Notification\b/gi, replacement: "Board / Govt Notification" },
+    { pattern: /\bUniversity Notifications\b/gi, replacement: "Board Notifications" },
+    { pattern: /\bUniversity\b/gi, replacement: "Education Board" },
+    { pattern: /\bDean\b/gi, replacement: "Vice Principal" },
     { pattern: /\bStreams\b/gi, key: "branches" },
     { pattern: /\bStream\b/gi, key: "branch" },
     { pattern: /\bBranch\b/gi, key: "branch" },
     { pattern: /\bBranches\b/gi, key: "branches" },
-    { pattern: /\bDepartment\b/gi, key: "branch" },
-    { pattern: /\bDepartments\b/gi, key: "branches" },
-    { pattern: /(?<!Library\s|Transport\s|Org\s)\bAdmin\b(?!istrat)/g, key: "admin" },
-    { pattern: /(?<!Library\s|Transport\s|Org\s)\bAdmins\b(?!istrat)/g, key: "admins" },
+    { pattern: /(?<!Library\s|Transport\s|Org\s|School\s)\bAdmin\b(?!istrat)/g, key: "admin" },
+    { pattern: /(?<!Library\s|Transport\s|Org\s|School\s)\bAdmins\b(?!istrat)/g, key: "admins" },
+    { pattern: /\bProctors\b/g, replacement: "Class Teachers" },
     { pattern: /\bProctor\b/g, key: "proctor" },
-    { pattern: /\bProctors\b/g, key: "proctor" },
     { pattern: /\bMentoring\b/g, key: "mentoring" },
     { pattern: /\bSemesters\b/gi, key: "semesters" },
     { pattern: /\bSemester\b/gi, key: "semester" },
+    { pattern: /\bSem(?=[\s:.-]|\b)(?!\w)/g, key: "semester" },
     { pattern: /\bElective\b/g, key: "electives" },
     { pattern: /\bElectives\b/g, key: "electives" },
     { pattern: /\bCO Attainment\b/g, key: "coAttainment" },
-    { pattern: /\bUSN\b/gi, key: "usn" },
+    { pattern: /\bUSN\b/g, key: "usn" },
   ];
 
-  for (const { pattern, key } of replacements) {
+  for (const item of replacements) {
+    const { pattern } = item;
     if (pattern.test(result)) {
-      let replacement = getTerm(key as any);
-      if (pattern.source.includes("HODs") || pattern.source.includes("Heads of Departments") || pattern.source.includes("Dept heads") || pattern.source.includes("Department heads") || pattern.source.includes("Proctors") || pattern.source.includes("Electives")) {
-        replacement = replacement + "s";
+      let replacement = (item as any).replacement || getTerm((item as any).key as any);
+      if (pattern.source.includes("HODs") || pattern.source.includes("Heads of Departments") || pattern.source.includes("Dept heads") || pattern.source.includes("Department heads") || pattern.source.includes("Electives")) {
+        if (!replacement.endsWith("s")) {
+          replacement = replacement + "s";
+        }
       }
 
       result = result.replace(pattern, (match) => {
         if (match === match.toLowerCase()) {
           return replacement.toLowerCase();
         }
-        if (key === 'hod' || key === 'usn') {
+        if ((item as any).key === 'hod' || (item as any).key === 'usn') {
           return replacement;
         }
         if (match === match.toUpperCase()) {

@@ -13,6 +13,7 @@ import { fetchWithTokenRefresh } from '../../utils/authService';
 import { API_ENDPOINT } from '../../utils/config';
 import { useTheme } from '../../context/ThemeContext';
 import { SkeletonTable } from '../ui/skeleton';
+import { translateTerminology, getTerm } from '../../utils/institutionConfig';
 
 interface Student {
   id: number;
@@ -464,28 +465,28 @@ const StudentBranchTransfer = () => {
                 </SelectContent>
               </Select>
 
-              {/* 2. BRANCH */}
+              {/* 2. BRANCH / STREAM */}
               <Select value={sourceBranchId} onValueChange={handleBranchChange} open={openBranch} onOpenChange={setOpenBranch} disabled={!sourceBatchId}>
                 <SelectTrigger id="source-branch-select">
-                  <SelectValue placeholder={sourceBatchId ? "Select Branch" : "Select Batch First"} />
+                  <SelectValue placeholder={sourceBatchId ? `Select ${getTerm("branch")}` : "Select Academic Year First"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Branches</SelectItem>
+                  <SelectItem value="all">All {getTerm("branches")}</SelectItem>
                   {branches.map(b => (
                     <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
-              {/* 3. SEMESTER */}
+              {/* 3. SEMESTER / CLASS */}
               <Select value={sourceSemesterId} onValueChange={handleSemesterChange} open={openSem} onOpenChange={setOpenSem} disabled={!sourceBranchId || (sourceBranchId !== 'all' && sourceSemesters.length === 0)}>
                 <SelectTrigger id="source-semester-select">
-                  <SelectValue placeholder={sourceBranchId ? "Select Semester" : "Select Branch First"} />
+                  <SelectValue placeholder={sourceBranchId ? `Select ${getTerm("semester")}` : `Select ${getTerm("branch")} First`} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Semesters</SelectItem>
+                  <SelectItem value="all">All {getTerm("semesters")}</SelectItem>
                   {sourceSemesters.map(s => (
-                    <SelectItem key={s.id} value={s.id.toString()}>Semester {s.number}</SelectItem>
+                    <SelectItem key={s.id} value={s.id.toString()}>{getTerm("semester")} {s.number}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -493,7 +494,7 @@ const StudentBranchTransfer = () => {
               {/* 4. SECTION */}
               <Select value={sourceSectionId} onValueChange={handleSectionChange} open={openSec} onOpenChange={setOpenSec} disabled={!sourceSemesterId || (sourceSemesterId !== 'all' && sourceSections.length === 0)}>
                 <SelectTrigger id="source-section-select">
-                  <SelectValue placeholder={sourceSemesterId ? "Select Section" : "Select Semester First"} />
+                  <SelectValue placeholder={sourceSemesterId ? "Select Section" : `Select ${getTerm("semester")} First`} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Sections</SelectItem>
@@ -513,7 +514,7 @@ const StudentBranchTransfer = () => {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="student-search"
-                  placeholder="Search by name or USN..."
+                  placeholder={`Search by name or ${getTerm("usn")}...`}
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                   className="pl-9"
@@ -551,10 +552,10 @@ const StudentBranchTransfer = () => {
                           onCheckedChange={(c) => toggleSelectAll(c as boolean)}
                         />
                       </th>
-                      <th className="p-4 whitespace-nowrap">USN</th>
+                      <th className="p-4 whitespace-nowrap">{getTerm("usn")} / Adm No</th>
                       <th className="p-4 whitespace-nowrap">Name</th>
-                      <th className="p-4 whitespace-nowrap">Branch</th>
-                      <th className="p-4 whitespace-nowrap">Semester</th>
+                      <th className="p-4 whitespace-nowrap">{getTerm("branch")}</th>
+                      <th className="p-4 whitespace-nowrap">{getTerm("semester")}</th>
                       <th className="p-4 whitespace-nowrap">Section</th>
                     </tr>
                   </thead>

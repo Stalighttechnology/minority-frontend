@@ -41,7 +41,7 @@ const Onboarding = () => {
     phone: "",
     plan: plan || "basic",
     accreditation_id: "",
-    institution_type: "engineering",
+    institution_type: "school",
     institution_address: "",
     billing_address: "",
     tax_id: "",
@@ -331,7 +331,7 @@ const Onboarding = () => {
                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Organization Name *</label>
                       <Input
                         required
-                        placeholder="e.g. AMC College of Engineering"
+                        placeholder="e.g. Greenwood High School"
                         className="bg-gray-50 border-gray-100 h-12 rounded-xl focus:ring-2 focus:ring-primary/20 transition-all"
                         value={formData.org_name}
                         onChange={e => setFormData({ ...formData, org_name: e.target.value })}
@@ -340,9 +340,9 @@ const Onboarding = () => {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Accreditation ID</label>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Board / Affiliation ID</label>
                         <Input
-                          placeholder="AICTE / UGC"
+                          placeholder="CBSE / ICSE / State Board"
                           className="bg-gray-50 border-gray-100 h-12 rounded-xl focus:ring-2 focus:ring-primary/20 transition-all"
                           value={formData.accreditation_id}
                           onChange={e => setFormData({ ...formData, accreditation_id: e.target.value })}
@@ -358,10 +358,10 @@ const Onboarding = () => {
                             <SelectValue placeholder="Select Type" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="engineering">Engineering College</SelectItem>
-                            <SelectItem value="medical">Medical College</SelectItem>
-                            <SelectItem value="school">School / K-12</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
+                            <SelectItem value="school">School (K-12 / Primary & High School)</SelectItem>
+                            <SelectItem value="pu_college">Pre-University / Junior College</SelectItem>
+                            <SelectItem value="academy">Educational Academy</SelectItem>
+                            <SelectItem value="other">Other Institution</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
