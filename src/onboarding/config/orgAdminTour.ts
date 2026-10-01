@@ -114,14 +114,6 @@ export const orgAdminTour: Step[] = [
     route: '/org-admin/attendance',
   },
   {
-    target: '#sidebar-exams',
-    title: 'Exams Portal',
-    content: 'Oversight of examinations schedule, status, and pending approvals.',
-    placement: 'right' as const,
-    disableBeacon: true,
-    route: '/org-admin/exams',
-  },
-  {
     target: '#sidebar-finance',
     title: 'Finance Dashboard',
     content: 'Analyze high-level financial health, fee collection charts, and transaction trends.',

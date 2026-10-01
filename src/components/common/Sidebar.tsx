@@ -603,7 +603,6 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
       { name: "Today's Attendance", page: "attendance" },
       { name: "Faculty Attendance", page: "faculty-attendance" },
       { name: "Low Attendance & Performance", page: "low-attendance" },
-      { name: "Exams", page: "exams" },
       { name: "Finance", page: "finance" },
       { name: "Payments", page: "payments" },
       { name: "Invoices", page: "invoices" },
