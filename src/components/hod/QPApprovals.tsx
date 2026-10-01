@@ -280,7 +280,7 @@ const QPApprovals = () => {
   const [historyTotalCount, setHistoryTotalCount] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("pending");
-  const [approvalChain, setApprovalChain] = useState<string[]>(['hod', 'principal', 'coe']);
+  const [approvalChain, setApprovalChain] = useState<string[]>(['hod', 'principal']);
 
   useEffect(() => {
     const fetchApprovalChain = async () => {
@@ -291,7 +291,10 @@ const QPApprovals = () => {
         if (response.ok) {
           const data = await response.json();
           if (data.qp_approval_chain) {
-            setApprovalChain(data.qp_approval_chain);
+            const cleanChain = (Array.isArray(data.qp_approval_chain) ? data.qp_approval_chain : []).filter(
+              (r: string) => (r || '').toLowerCase() !== 'coe'
+            );
+            setApprovalChain(cleanChain.length > 0 ? cleanChain : ['hod', 'principal']);
           }
         }
       } catch (err) {}

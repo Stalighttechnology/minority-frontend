@@ -606,8 +606,6 @@ export default function PrincipalTimetableSettings() {
   const [attendanceSaving, setAttendanceSaving] = useState(false);
 
   const PRESETS: Record<string, string[]> = {
-    "Common": ["hod", "principal"],
-    "Standard": ["hod", "principal", "dean"],
     "Short": ["hod", "principal"],
     "Extended": ["hod", "principal", "dean"],
   };
@@ -667,7 +665,11 @@ export default function PrincipalTimetableSettings() {
       const res = await fetchWithTokenRefresh(`${API_ENDPOINT}/organizations/qp-approval-chain/`);
       if (res.ok) {
         const data = await res.json();
-        setApprovalChain(data.qp_approval_chain || ['hod', 'principal']);
+        const rawChain = data.qp_approval_chain || ['hod', 'principal'];
+        const cleanChain = (Array.isArray(rawChain) ? rawChain : ['hod', 'principal']).filter(
+          (r: string) => (r || '').toLowerCase() !== 'coe'
+        );
+        setApprovalChain(cleanChain.length > 0 ? cleanChain : ['hod', 'principal']);
       }
     } catch (err) {
       console.error(err);
@@ -728,12 +730,15 @@ export default function PrincipalTimetableSettings() {
   const handleSaveApprovalChain = async () => {
     try {
       setChainSaving(true);
+      const cleanChain = approvalChain.filter((r) => (r || '').toLowerCase() !== 'coe');
+      const chainToSave = cleanChain.length > 0 ? cleanChain : ['hod', 'principal'];
       const res = await fetchWithTokenRefresh(`${API_ENDPOINT}/organizations/qp-approval-chain/`, {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qp_approval_chain: approvalChain })
+        body: JSON.stringify({ qp_approval_chain: chainToSave })
       });
       if (res.ok) {
+        setApprovalChain(chainToSave);
         toast({ title: "Success", description: "Approval workflow saved" });
       } else {
         toast({ title: "Error", description: "Failed to save workflow", variant: "destructive" });
@@ -3390,7 +3395,9 @@ export default function PrincipalTimetableSettings() {
                           </div>
                           <ChevronRight className="w-4 h-4 text-muted-foreground" />
 
-                          {approvalChain.map((role, index) => (
+                          {approvalChain
+                            .filter((r) => (r || '').toLowerCase() !== 'coe')
+                            .map((role, index, arr) => (
                             <React.Fragment key={`${role}-${index}`}>
                               <div className="flex items-center gap-1">
                                 <div className={`px-3 py-1.5 rounded-full border text-sm font-medium ${theme === 'dark' ? 'bg-card border-border text-foreground' : 'bg-white border-gray-200 text-gray-700'}`}>
@@ -3398,10 +3405,10 @@ export default function PrincipalTimetableSettings() {
                                 </div>
                               </div>
 
-                              {index < approvalChain.length - 1 && (
+                              {index < arr.length - 1 && (
                                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
                               )}
-                              {index === approvalChain.length - 1 && (
+                              {index === arr.length - 1 && (
                                 <div className="flex items-center gap-2 ml-2">
                                   <ChevronRight className="w-4 h-4 text-green-500" />
                                   <div className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-xs font-semibold text-green-700 dark:text-green-400">
