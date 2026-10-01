@@ -118,15 +118,6 @@ export const coeTour: Step[] = [
     route: '/coe/course-statistics',
   },
   {
-    target: '#sidebar-co-attainment',
-    title: 'CO/PO Attainment',
-    content:
-      'Track and evaluate Course Outcome and Program Outcome attainment levels.',
-    placement: 'right' as const,
-    disableBeacon: false,
-    route: '/coe/co-attainment',
-  },
-  {
     target: '#sidebar-announcement-management',
     title: 'Announcement Management',
     content:

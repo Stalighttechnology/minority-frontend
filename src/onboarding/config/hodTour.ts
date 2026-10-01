@@ -170,15 +170,6 @@ export const hodTour: Step[] = [
     route: '/hod/qp-approvals',
   },
   {
-    target: '#sidebar-co-attainment',
-    title: 'CO Attainment',
-    content:
-      "Calculate and analyze Course Outcome (CO) attainment levels for your courses.",
-    placement: 'right' as const,
-    disableBeacon: false,
-    route: '/hod/co-attainment',
-  },
-  {
     target: '#sidebar-promotion-management',
     title: 'Promotion Management',
     content:

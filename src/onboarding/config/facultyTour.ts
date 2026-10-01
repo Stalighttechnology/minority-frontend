@@ -106,15 +106,6 @@ export const facultyTour: Step[] = [
     route: '/faculty/syllabus-status',
   },
   {
-    target: '#sidebar-co-attainment',
-    title: 'CO Attainment',
-    content:
-      'Calculate and analyze Course Outcome (CO) attainment levels for your courses.',
-    placement: 'right' as const,
-    disableBeacon: false,
-    route: '/faculty/co-attainment',
-  },
-  {
     target: '#sidebar-exam-applications',
     title: 'Exam Applications',
     content: 'Review and manage exam registration applications.',

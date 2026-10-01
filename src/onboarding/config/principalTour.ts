@@ -119,14 +119,6 @@ export const principalTour: Step[] = [
     route: '/admin/qp-approvals',
   },
   {
-    target: '#sidebar-co-attainment',
-    title: 'CO PO Attainment',
-    content: 'Track institutional Course Outcome (CO) attainment and PO mapping.',
-    placement: 'right' as const,
-    disableBeacon: false,
-    route: '/admin/co-attainment',
-  },
-  {
     target: '#sidebar-hod-attendance',
     title: 'HOD Attendance',
     content: 'Monitor and track HOD attendance records, checks-in, and statuses.',

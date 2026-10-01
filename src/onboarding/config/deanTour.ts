@@ -55,15 +55,6 @@ export const deanTour: Step[] = [
     route: '/dean/exams',
   },
   {
-    target: '#sidebar-co-attainment',
-    title: 'CO/PO Attainment',
-    content:
-      'Calculate and analyze Course Outcome (CO) attainment and PO mapping levels across departments.',
-    placement: 'right' as const,
-    disableBeacon: false,
-    route: '/dean/co-attainment',
-  },
-  {
     target: '#sidebar-faculty',
     title: 'Faculty Profiles',
     content:
