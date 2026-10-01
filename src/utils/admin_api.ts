@@ -1,0 +1,1554 @@
+import { API_ENDPOINT } from "./config";
+import { fetchWithTokenRefresh, fetchWithSuperadminTokenRefresh } from "./authService";
+
+// Type definitions for request and response data
+interface BranchDistribution {
+  name: string;
+  students: number;
+  faculty: number;
+}
+
+interface RoleDistribution {
+  students: number;
+  faculty: number;
+  hods: number;
+  coe: number;
+  principals: number;
+}
+
+interface AdminStatsResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    total_students: number;
+    total_faculty: number;
+    total_hods: number;
+    total_coe: number;
+    total_branches: number;
+    branch_distribution: BranchDistribution[];
+    role_distribution: RoleDistribution;
+    unread_announcement_count?: number;
+  };
+}
+
+interface EnrollUserRequest {
+  username: string;
+  email: string;
+  role: "hod" | "teacher" | "coe" | "hms_admin";
+  first_name: string;
+  last_name?: string;
+  phone?: string;
+  designation?: string;
+}
+
+interface EnrollUserResponse {
+  success: boolean;
+  message?: string;
+  user_id?: string;
+}
+
+interface BulkUploadFacultyResponse {
+  success: boolean;
+  message?: string;
+  created_count?: number;
+  updated_count?: number;
+  uploaded_count?: number;
+  errors?: string[];
+  created?: Array<{name: string;email: string;username: string;}>;
+  updated?: Array<{name: string;email: string;username: string;}>;
+}
+
+interface Branch {
+  id: number;
+  name: string;
+  hod?: {id: string;first_name: string;last_name: string;};
+  semesters: number[];
+  sections: {name: string;semester: number;}[];
+}
+
+export interface ManageSupportTicketsResponse {
+  success: boolean;
+  message?: string;
+  tickets?: SupportTicket[];
+  ticket?: SupportTicket;
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: SupportTicket[];
+}
+
+export interface BillingAndSupportResponse {
+  success: boolean;
+  message?: string;
+  org_details?: {
+    name: string;
+    created_at: string;
+    plan_type: string;
+    subscription_started_at: string | null;
+    subscription_expires_at: string | null;
+    is_active: boolean;
+    accreditation_id: string | null;
+    billing_address: string | null;
+    tax_id: string | null;
+    tech_poc_name: string | null;
+    tech_poc_email: string | null;
+    tech_poc_mobile: string | null;
+    razorpay_order_id: string | null;
+  };
+  payment_history?: Array<{
+    id: number;
+    amount: string;
+    plan_type: string;
+    status: string;
+    transaction_id: string;
+    timestamp: string;
+  }>;
+  support_tickets?: Array<{
+    id: number;
+    ticket_id: string;
+    subject: string;
+    description: string;
+    priority: string;
+    status: string;
+    created_at: string;
+  }>;
+}
+
+export const getBillingAndSupport = async (): Promise<BillingAndSupportResponse> => {
+  const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/billing-support/`, {
+    method: "GET"
+  });
+  const result = await response.json();
+  return result;
+};
+
+interface ManageBranchesResponse {
+  success: boolean;
+  message?: string;
+  branches?: Branch[];
+  branch?: Branch;
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: Branch[];
+}
+
+interface Batch {
+  id: number;
+  name: string;
+  start_year: number;
+  end_year: number;
+  student_count: number;
+  created_at: string;
+}
+
+interface ManageBatchesResponse {
+  success: boolean;
+  message?: string;
+  batches?: Batch[];
+  batch?: Batch;
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: Batch[];
+}
+
+interface ManageBatchesRequest {
+  start_year?: number;
+  end_year?: number;
+  page?: number;
+  page_size?: number;
+  search?: string;
+}
+
+interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  target_role: string;
+  created_at: string;
+  scheduled_at?: string;
+}
+
+interface ManageNotificationsResponse {
+  success?: boolean;
+  message?: string;
+  notifications?: Notification[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: {
+    success: boolean;
+    notifications: Notification[];
+  };
+}
+
+interface HODLeave {
+  id: number;
+  faculty: {id: string;first_name: string;last_name: string;};
+  branch: {id: number;name: string;};
+  start_date: string;
+  end_date: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+}
+
+interface ManageHODLeavesResponse {
+  success: boolean;
+  message?: string;
+  leaves?: HODLeave[];
+  leave?: {
+    id: number;
+    hod_name: string;
+    branch: string;
+    start_date: string;
+    end_date: string;
+    reason: string;
+    status: string;
+    submitted_at: string;
+  };
+  calendar?: {date: string;leaves: {id: number;hod: string;status: string;}[];}[];
+}
+
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  first_name: string;
+  last_name: string;
+  is_active: boolean;
+  extra: {
+    usn?: string;
+    branch?: string;
+    branches?: string[];
+  };
+}
+
+interface ManageUsersResponse {
+  success: boolean;
+  message?: string;
+  users?: User[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: User[];
+}
+
+interface ManageAdminProfileRequest {
+  user_id: string;
+  action?: string;
+  updates?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    mobile_number?: string;
+    address?: string;
+    bio?: string;
+    profile_picture_url?: string;
+    library_id?: string;
+    vtu_staff_id?: string;
+    aicte_id?: string;
+  };
+}
+
+interface ManageAdminProfileResponse {
+  success: boolean;
+  message?: string;
+  profile?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    mobile_number: string;
+    address: string;
+    bio: string;
+    profile_picture?: string;
+    designation?: string;
+    library_id?: string;
+    vtu_staff_id?: string;
+    aicte_id?: string;
+  };
+}
+
+let adminStatsPromise: Promise<AdminStatsResponse> | null = null;
+let adminStatsTimestamp = 0;
+
+export const getAdminStats = async (): Promise<AdminStatsResponse> => {
+  const now = Date.now();
+  if (adminStatsPromise && now - adminStatsTimestamp < 5000) {
+    return adminStatsPromise;
+  }
+
+  adminStatsPromise = (async () => {
+    try {
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/stats-overview/`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+          "Content-Type": "application/json"
+        }
+      });
+      const result = await response.json();
+      if (!response.ok) {
+
+        return { success: false, message: result.message || `HTTP ${response.status}` };
+      }
+      return result;
+    } catch (error) {
+
+      return { success: false, message: "Network error" };
+    }
+  })();
+
+  adminStatsTimestamp = now;
+  return adminStatsPromise;
+};
+
+export const enrollUser = async (data: EnrollUserRequest): Promise<EnrollUserResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/enroll-user/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const bulkUploadFaculty = async (file: File): Promise<BulkUploadFacultyResponse> => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/bulk-upload-faculty/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`
+      },
+      body: formData
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const manageBranches = async (
+data?: {page?: number;page_size?: number;name?: string;hod_id?: string;compact?: boolean;},
+branch_id?: number,
+method: "GET" | "POST" | "PUT" | "DELETE" = "GET")
+: Promise<ManageBranchesResponse> => {
+  try {
+    let url = branch_id ?
+    `${API_ENDPOINT}/admin/branches/${branch_id}/` :
+    `${API_ENDPOINT}/admin/branches/`;
+
+    // Add pagination parameters for GET requests
+    if (method === "GET" && data && !branch_id) {
+      const params = new URLSearchParams();
+      if (data.page) params.append('page', data.page.toString());
+      if (data.page_size) params.append('page_size', data.page_size.toString());
+      if ((data as any).search) params.append('search', (data as any).search);
+      if (data.compact) params.append('compact', 'true');
+      if (params.toString()) url += `?${params.toString()}`;
+    }
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${sessionStorage.getItem("access_token")}`
+    };
+    const bodyPayload = method !== "GET" && data ? JSON.stringify(data) : undefined;
+    if (bodyPayload) headers['Content-Type'] = 'application/json';
+
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers,
+      body: bodyPayload
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+interface HODUser {
+  id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+interface BranchesWithHODsResponse {
+  success: boolean;
+  message?: string;
+  branches?: Branch[];
+  hods?: HODUser[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: Branch[];
+}
+
+export const getBranchesWithHODs = async (
+data?: {page?: number;page_size?: number;search?: string;})
+: Promise<BranchesWithHODsResponse> => {
+  try {
+    let url = `${API_ENDPOINT}/admin/branches-with-hods/`;
+
+    // Build query params (include compact=true by default to reduce payload)
+    const params = new URLSearchParams();
+    params.append('compact', 'true');
+    if (data) {
+      if (data.page) params.append('page', data.page.toString());
+      if (data.page_size) params.append('page_size', data.page_size.toString());
+      if (data.search) params.append('search', data.search);
+    }
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+
+    const response = await fetchWithTokenRefresh(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const manageBatches = async (
+data?: ManageBatchesRequest,
+batch_id?: number,
+method: "GET" | "POST" | "PUT" | "DELETE" = "GET")
+: Promise<ManageBatchesResponse> => {
+  try {
+    let url = batch_id ?
+    `${API_ENDPOINT}/admin/batches/${batch_id}/` :
+    `${API_ENDPOINT}/admin/batches/`;
+
+    // Add pagination and filter parameters for GET requests
+    if (method === "GET" && data && !batch_id) {
+      const params = new URLSearchParams();
+      if (data.page) params.append('page', data.page.toString());
+      if (data.page_size) params.append('page_size', data.page_size.toString());
+      if (data.start_year) params.append('start_year', data.start_year.toString());
+      if (data.end_year) params.append('end_year', data.end_year.toString());
+      if (data.search) params.append('search', data.search);
+      if (params.toString()) url += `?${params.toString()}`;
+    }
+
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: method !== "GET" && data ? JSON.stringify(data) : undefined
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const manageNotifications = async (
+data?: {page?: number;page_size?: number;},
+method: "GET" | "POST" = "GET")
+: Promise<ManageNotificationsResponse> => {
+  try {
+    let url = `${API_ENDPOINT}/admin/notifications/`;
+
+    // Add pagination parameters for GET requests
+    if (method === "GET" && data) {
+      const params = new URLSearchParams();
+      if (data.page) params.append('page', data.page.toString());
+      if (data.page_size) params.append('page_size', data.page_size.toString());
+      if (params.toString()) url += `?${params.toString()}`;
+    }
+
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: method === "POST" && data ? JSON.stringify(data) : undefined
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const manageHODLeaves = async (
+data?: any,
+method: "GET" | "POST" = "GET")
+: Promise<ManageHODLeavesResponse> => {
+  try {
+    let url = `${API_ENDPOINT}/admin/hod-leaves/`;
+
+    // Add query parameters for GET requests
+    if (method === "GET" && data) {
+      const params = new URLSearchParams();
+      Object.keys(data).forEach((key) => {
+        if (data[key] !== undefined && data[key] !== null) {
+          params.append(key, data[key].toString());
+        }
+      });
+      if (params.toString()) url += `?${params.toString()}`;
+    }
+
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: method === "POST" && data ? JSON.stringify(data) : undefined
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const manageDepartmentAdminLeaves = async (
+data?: any,
+method: "GET" | "POST" = "GET")
+: Promise<ManageHODLeavesResponse> => {
+  try {
+    let url = `${API_ENDPOINT}/admin/department-admin-leaves/`;
+
+    if (method === "GET" && data) {
+      const params = new URLSearchParams();
+      Object.keys(data).forEach((key) => {
+        if (data[key] !== undefined && data[key] !== null) {
+          params.append(key, data[key].toString());
+        }
+      });
+      if (params.toString()) url += `?${params.toString()}`;
+    }
+
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: method === "POST" && data ? JSON.stringify(data) : undefined
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const manageUsers = async (
+data?: {page?: number;page_size?: number;role?: string;is_active?: boolean;search?: string;},
+method: "GET" | "POST" = "GET")
+: Promise<ManageUsersResponse> => {
+  try {
+    let url = `${API_ENDPOINT}/admin/users/`;
+
+    // Add pagination and filter parameters for GET requests
+    if (method === "GET" && data) {
+      const params = new URLSearchParams();
+      if (data.page) params.append('page', data.page.toString());
+      if (data.page_size) params.append('page_size', data.page_size.toString());
+      if (data.role) params.append('role', data.role);
+      if (data.is_active !== undefined) params.append('is_active', data.is_active.toString());
+      if (data.search) params.append('search', data.search);
+      if ((data as any).department) params.append('department', (data as any).department);
+      if (params.toString()) url += `?${params.toString()}`;
+    }
+
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: method === "POST" && data ? JSON.stringify(data) : undefined
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+interface ManageUserActionRequest {
+  user_id: string;
+  action: 'edit' | 'deactivate' | 'delete' | 'promote';
+  updates?: {
+    username?: string;
+    email?: string;
+    first_name?: string;
+    last_name?: string;
+    role?: string;
+  };
+}
+
+interface ManageUserActionResponse {
+  success: boolean;
+  message?: string;
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+    role: string;
+    first_name: string;
+    last_name: string;
+    is_active: boolean;
+    extra: {
+      usn?: string;
+      branch?: string;
+      branches?: string[];
+    };
+  };
+}
+
+export const manageUserAction = async (data: ManageUserActionRequest): Promise<ManageUserActionResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/users/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const manageAdminProfile = async (
+data: ManageAdminProfileRequest,
+method: "GET" | "POST" = "POST")
+: Promise<ManageAdminProfileResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/profile/${data.user_id}/`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      // avoid conditional requests for profile GETs in production
+      cache: method === 'GET' ? 'no-store' : undefined,
+      body: method === "POST" ? JSON.stringify(data) : undefined
+    });
+
+    // Handle 304 Not Modified: return cached profile if available
+    if (response.status === 304) {
+      try {
+        const cached = sessionStorage.getItem("user");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          return { success: true, profile: parsed } as ManageAdminProfileResponse;
+        }
+        return { success: false, message: 'Profile not modified and no cached profile available' } as ManageAdminProfileResponse;
+      } catch (e) {
+
+        return { success: false, message: 'Profile not modified and failed to read cache' } as ManageAdminProfileResponse;
+      }
+    }
+
+    let result: any = null;
+    try {
+      result = await response.json();
+    } catch (e) {
+
+    }
+
+    if (!response.ok) {
+
+      return { success: false, message: result && result.message || `HTTP ${response.status}` };
+    }
+
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+interface BulkUserAction {
+  user_id: string;
+  action: 'edit' | 'deactivate' | 'delete' | 'promote';
+  updates?: {
+    username?: string;
+    email?: string;
+    first_name?: string;
+    last_name?: string;
+    role?: string;
+  };
+}
+
+interface BulkUserActionsRequest {
+  actions: BulkUserAction[];
+}
+
+interface BulkUserActionsResponse {
+  success: boolean;
+  message?: string;
+  results?: Array<{
+    user_id: string;
+    action: string;
+    success: boolean;
+    message: string;
+  }>;
+  summary?: {
+    total_actions: number;
+    successful: number;
+    errors: number;
+  };
+}
+
+export const bulkUserActions = async (data: BulkUserActionsRequest): Promise<BulkUserActionsResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/users/bulk-actions/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+interface BulkHODLeaveAction {
+  leave_id: number;
+  action: 'APPROVED' | 'REJECTED';
+}
+
+interface BulkHODLeaveActionsRequest {
+  actions: BulkHODLeaveAction[];
+}
+
+interface BulkHODLeaveActionsResponse {
+  success: boolean;
+  message?: string;
+  results?: Array<{
+    leave_id: number;
+    action: string;
+    success: boolean;
+    message: string;
+  }>;
+  summary?: {
+    total_actions: number;
+    successful: number;
+    errors: number;
+  };
+}
+
+export const bulkProcessHODLeaves = async (data: BulkHODLeaveActionsRequest): Promise<BulkHODLeaveActionsResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/hod-leaves/bulk-process/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+// Admin Leave Interfaces
+interface AdminLeaveRequest {
+  title: string;
+  start_date: string;
+  end_date: string;
+  reason: string;
+}
+
+interface AdminLeave {
+  id: number;
+  title: string;
+  date: string;
+  reason: string;
+  status: string;
+}
+
+interface AdminLeaveApplicationsResponse {
+  success: boolean;
+  message?: string;
+  data?: AdminLeave[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: AdminLeave[];
+}
+
+interface AdminLeaveApplicationsRequest {
+  title: string;
+  start_date: string;
+  end_date: string;
+  reason: string;
+}
+
+// Admin Leave Functions
+export const adminLeaveApplications = async (
+data?: AdminLeaveApplicationsRequest,
+method: "GET" | "POST" = "GET")
+: Promise<AdminLeaveApplicationsResponse> => {
+  try {
+    let url = `${API_ENDPOINT}/admin/leave-applications/`;
+    if (method === "GET" && data) {
+      const params = new URLSearchParams();
+      const anyData = data as any;
+      if (anyData.page) params.append('page', anyData.page.toString());
+      if (anyData.page_size) params.append('page_size', anyData.page_size.toString());
+      if (params.toString()) url += `?${params.toString()}`;
+    }
+
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: method === "POST" && data ? JSON.stringify(data) : undefined
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+interface ManageAdminProfilePatchRequest {
+  user_id: string;
+  updates: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    mobile_number?: string;
+    address?: string;
+    bio?: string;
+    profile_picture_url?: string;
+    library_id?: string;
+    vtu_staff_id?: string;
+    aicte_id?: string;
+  };
+}
+
+interface ManageAdminProfilePatchResponse {
+  success: boolean;
+  message?: string;
+  profile?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    mobile_number: string;
+    address: string;
+    bio: string;
+    profile_picture?: string;
+    library_id?: string;
+    vtu_staff_id?: string;
+    aicte_id?: string;
+  };
+  changes?: Record<string, any>;
+}
+
+export const manageAdminProfilePatch = async (data: ManageAdminProfilePatchRequest): Promise<ManageAdminProfilePatchResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/profile/${data.user_id}/`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+interface CampusLocation {
+  id: number;
+  name: string;
+  description: string;
+  is_active: boolean;
+  center_latitude: number;
+  center_longitude: number;
+  radius_meters: number;
+  min_latitude?: number;
+  max_latitude?: number;
+  min_longitude?: number;
+  max_longitude?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ManageCampusLocationResponse {
+  success: boolean;
+  message?: string;
+  location?: CampusLocation;
+  locations?: CampusLocation[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: CampusLocation[];
+}
+
+export const manageCampusLocation = async (
+data?: {
+  name?: string;
+  description?: string;
+  is_active?: boolean;
+  center_latitude?: number;
+  center_longitude?: number;
+  radius_meters?: number;
+  min_latitude?: number;
+  max_latitude?: number;
+  min_longitude?: number;
+  max_longitude?: number;
+  page?: number;
+  page_size?: number;
+},
+location_id?: number,
+method: "GET" | "POST" | "PUT" | "DELETE" = "GET")
+: Promise<ManageCampusLocationResponse> => {
+  try {
+    let url = location_id ?
+    `${API_ENDPOINT}/admin/campus-locations/${location_id}/` :
+    `${API_ENDPOINT}/admin/campus-locations/`;
+
+    // Add pagination parameters for GET requests
+    if (method === "GET" && data && !location_id) {
+      const params = new URLSearchParams();
+      if (data.page) params.append('page', data.page.toString());
+      if (data.page_size) params.append('page_size', data.page_size.toString());
+      if (params.toString()) url += `?${params.toString()}`;
+    }
+
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: method !== "GET" && data ? JSON.stringify(data) : undefined
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const manageOfficeLocation = async (
+data?: {
+  name?: string;
+  description?: string;
+  is_active?: boolean;
+  center_latitude?: number;
+  center_longitude?: number;
+  radius_meters?: number;
+},
+location_id?: number,
+method: "GET" | "POST" | "PUT" | "DELETE" = "GET")
+: Promise<ManageCampusLocationResponse> => {
+  try {
+    let url = location_id ?
+    `${API_ENDPOINT}/superadmin/office-locations/${location_id}/` :
+    `${API_ENDPOINT}/superadmin/office-locations/`;
+
+    const response = await fetchWithSuperadminTokenRefresh(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("superadmin_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: method !== "GET" && data ? JSON.stringify(data) : undefined
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getDeveloperAttendanceAudit = async (
+  params?: { start_date?: string; end_date?: string; developer_id?: number | string; }
+): Promise<any> => {
+  try {
+    let url = `${API_ENDPOINT}/superadmin/developers/attendance-audit/`;
+    const searchParams = new URLSearchParams();
+    if (params) {
+      if (params.start_date) searchParams.append('start_date', params.start_date);
+      if (params.end_date) searchParams.append('end_date', params.end_date);
+      if (params.developer_id) searchParams.append('developer_id', params.developer_id.toString());
+    }
+    searchParams.append('_t', Date.now().toString());
+    url += `?${searchParams.toString()}`;
+
+    const response = await fetchWithSuperadminTokenRefresh(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("superadmin_token")}`,
+      },
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const markDeveloperAttendance = async (data: MarkDeveloperAttendanceRequest): Promise<any> => {
+  try {
+    const response = await fetchWithSuperadminTokenRefresh(`${API_ENDPOINT}/developer/mark-attendance/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("superadmin_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getDeveloperAttendanceRecords = async (params?: { page?: number; page_size?: number; start_date?: string; end_date?: string }): Promise<any> => {
+  try {
+    let url = `${API_ENDPOINT}/developer/my-attendance-records/`;
+    if (params) {
+      const searchParams = new URLSearchParams();
+      if (params.page) searchParams.append('page', params.page.toString());
+      if (params.page_size) searchParams.append('page_size', params.page_size.toString());
+      if (params.start_date) searchParams.append('start_date', params.start_date);
+      if (params.end_date) searchParams.append('end_date', params.end_date);
+      if (searchParams.toString()) {
+        url += `?${searchParams.toString()}`;
+      }
+    }
+
+    const response = await fetchWithSuperadminTokenRefresh(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("superadmin_token")}`,
+      },
+    });
+    const json = await response.json();
+    // DRF PageNumberPagination wraps in { count, next, previous, results: { success, data, stats } }
+    if (json.results && typeof json.results === 'object' && !Array.isArray(json.results)) {
+      return {
+        ...json.results,
+        count: json.count,
+        next: json.next,
+        previous: json.previous,
+      };
+    }
+    return json;
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getAdminFacultyAttendanceToday = async (
+  branchId: number | string,
+  params?: { page?: number; page_size?: number }
+): Promise<any> => {
+  try {
+    let url = `${API_ENDPOINT}/admin/faculty-attendance-today/?branch_id=${branchId}`;
+    if (params) {
+      if (params.page) url += `&page=${params.page}`;
+      if (params.page_size) url += `&page_size=${params.page_size}`;
+    }
+
+    const response = await fetchWithTokenRefresh(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getAdminFacultyAttendanceRecords = async (
+  branchId: number | string,
+  params?: {
+    page?: number;
+    page_size?: number;
+    faculty_id?: string;
+    start_date?: string;
+    end_date?: string;
+  }
+): Promise<any> => {
+  try {
+    let url = `${API_ENDPOINT}/admin/faculty-attendance-records/?branch_id=${branchId}`;
+    if (params) {
+      if (params.page) url += `&page=${params.page}`;
+      if (params.page_size) url += `&page_size=${params.page_size}`;
+      if (params.faculty_id) url += `&faculty_id=${params.faculty_id}`;
+      if (params.start_date) url += `&start_date=${params.start_date}`;
+      if (params.end_date) url += `&end_date=${params.end_date}`;
+    }
+
+    const response = await fetchWithTokenRefresh(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const applyDepartmentAdminLeave = async (data: any): Promise<any> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/apply-department-admin-leave/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getDepartmentAdminApplyLeaveBootstrap = async (queryString: string): Promise<any> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/apply-department-admin-leave/${queryString}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+
+export interface DeveloperAttendanceRecord {
+  id: string | number;
+  date: string;
+  status: string;
+  marked_at?: string;
+  notes?: string;
+  latitude?: number;
+  longitude?: number;
+  distance_meters?: number;
+}
+
+export interface MarkDeveloperAttendanceRequest {
+  status: string;
+  action?: string;
+  notes?: string;
+  latitude?: number;
+  longitude?: number;
+  device_info?: any;
+  off_campus_reason?: string;
+}
+
+export const transferStudents = async (data: { student_ids: number[]; target_branch_id: number; target_semester_id: number; target_section_id?: number }) => {
+  return fetchWithTokenRefresh(`${API_ENDPOINT}/admin/student-transfer/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+};
+
+export const getAdminStudents = async (params: { branch_id?: number | string; semester_id?: number | string; batch_id?: number | string; section_id?: number | string; search?: string; page?: number; page_size?: number }) => {
+  const query = new URLSearchParams();
+  if (params.branch_id) query.append("branch_id", params.branch_id.toString());
+  if (params.semester_id) query.append("semester_id", params.semester_id.toString());
+  if (params.batch_id) query.append("batch_id", params.batch_id.toString());
+  if (params.section_id) query.append("section_id", params.section_id.toString());
+  if (params.search) query.append("search", params.search);
+  if (params.page) query.append("page", params.page.toString());
+  if (params.page_size) query.append("page_size", params.page_size.toString());
+  return fetchWithTokenRefresh(`${API_ENDPOINT}/admin/students/?${query.toString()}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+};
+
+export interface AdminAttendanceRecord {
+  id: number;
+  date: string;
+  subject: string | null;
+  subject_id: number | null;
+  subject_code: string | null;
+  subject_type: string;
+  section: string | null;
+  section_id: number | null;
+  semester: number | null;
+  semester_id: number | null;
+  branch: string | null;
+  branch_id: number | null;
+  batch: string | null;
+  batch_id: number | null;
+  faculty_id: number | null;
+  faculty_name: string;
+  lab_batch_id: number | null;
+  lab_batch_name: string | null;
+  file_path: string | null;
+  status: string;
+  summary: {
+    present_count: number;
+    absent_count: number;
+    total_count: number;
+    present_percentage: number;
+  };
+}
+
+export interface AdminAttendanceFiltersResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    branches: Array<{ id: number; name: string; code?: string }>;
+    batches: Array<{ id: number; name: string; start_year?: number; end_year?: number }>;
+    semesters: Array<{ id: number; number: number; branch_id?: number }>;
+    sections: Array<{ id: number; name: string; semester_id: number | null; branch_id?: number }>;
+    subjects: Array<{ id: number; name: string; subject_code: string; subject_type: string; semester_id: number | null; branch_id?: number }>;
+    overall: {
+      total_sessions: number;
+      total_present: number;
+      total_absent: number;
+      avg_attendance: number;
+    };
+    branch_stats: Array<{
+      branch_id: string;
+      branch_name: string;
+      sessions: number;
+      present: number;
+      absent: number;
+      attendance_percentage: number;
+    }>;
+    batch_stats: Array<{
+      batch_id: string;
+      batch_name: string;
+      sessions: number;
+      present: number;
+      absent: number;
+      attendance_percentage: number;
+    }>;
+    semester_stats: Array<{
+      semester_id: string;
+      semester_number: number;
+      sessions: number;
+      present: number;
+      absent: number;
+      attendance_percentage: number;
+    }>;
+  };
+}
+
+export interface GetAdminAttendanceRecordsResponse {
+  success: boolean;
+  message?: string;
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+  next?: string | null;
+  previous?: string | null;
+  data?: AdminAttendanceRecord[];
+  meta?: {
+    total_records: number;
+  };
+}
+
+export interface AdminAttendanceRecordDetailsResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    id: number;
+    date: string;
+    subject: string | null;
+    subject_code: string | null;
+    subject_type: string;
+    section: string | null;
+    semester: number | null;
+    branch: string | null;
+    batch_name: string | null;
+    batch_id: number | null;
+    faculty_name: string;
+    lab_batch_name: string | null;
+    present: Array<{
+      id: number;
+      name: string;
+      usn: string;
+      status?: boolean;
+      subject_percentage?: number;
+      subject_present?: number;
+      subject_total?: number;
+      subject_absent?: number;
+    }>;
+    absent: Array<{
+      id: number;
+      name: string;
+      usn: string;
+      status?: boolean;
+      subject_percentage?: number;
+      subject_present?: number;
+      subject_total?: number;
+      subject_absent?: number;
+    }>;
+    present_count: number;
+    absent_count: number;
+    total_count: number;
+    present_percentage: number;
+  };
+}
+
+export const getAdminAttendanceFilters = async (branchId?: string): Promise<AdminAttendanceFiltersResponse> => {
+  try {
+    const qs = branchId && branchId !== "all" ? `?branch_id=${branchId}` : "";
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/attendance-records/filters/${qs}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getAdminAttendanceRecordsWithSummary = async (params?: {
+  page?: number;
+  page_size?: number;
+  branch_id?: string;
+  batch_id?: string;
+  semester_id?: string;
+  section_id?: string;
+  subject_id?: string;
+  lab_batch_id?: string;
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+}): Promise<GetAdminAttendanceRecordsResponse> => {
+  try {
+    const query = new URLSearchParams();
+    if (params?.page) query.append("page", String(params.page));
+    if (params?.page_size) query.append("page_size", String(params.page_size));
+    if (params?.branch_id && params.branch_id !== "all") query.append("branch_id", params.branch_id);
+    if (params?.batch_id && params.batch_id !== "all") query.append("batch_id", params.batch_id);
+    if (params?.semester_id && params.semester_id !== "all") query.append("semester_id", params.semester_id);
+    if (params?.section_id && params.section_id !== "all") query.append("section_id", params.section_id);
+    if (params?.subject_id && params.subject_id !== "all") query.append("subject_id", params.subject_id);
+    if (params?.lab_batch_id && params.lab_batch_id !== "all") query.append("lab_batch_id", params.lab_batch_id);
+    if (params?.date) query.append("date", params.date);
+    if (params?.start_date) query.append("start_date", params.start_date);
+    if (params?.end_date) query.append("end_date", params.end_date);
+    if (params?.search) query.append("search", params.search);
+
+    const qs = query.toString() ? `?${query.toString()}` : "";
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/attendance-records/${qs}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getAdminAttendanceRecordDetails = async (
+  recordId: number | string,
+  startDate?: string,
+  endDate?: string
+): Promise<AdminAttendanceRecordDetailsResponse> => {
+  try {
+    const params = new URLSearchParams();
+    if (startDate) params.append("start_date", startDate);
+    if (endDate) params.append("end_date", endDate);
+    const queryString = params.toString() ? `?${params.toString()}` : "";
+
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/attendance-records/${recordId}/details/${queryString}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getAdminStudentAttendanceSummary = async (params: {
+  semester_id: string;
+  section_id: string;
+  branch_id?: string;
+  batch_id?: string;
+  subject_id?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+}): Promise<any> => {
+  try {
+    const query = new URLSearchParams();
+    query.append("semester_id", params.semester_id);
+    query.append("section_id", params.section_id);
+    if (params.branch_id && params.branch_id !== "all") query.append("branch_id", params.branch_id);
+    if (params.batch_id && params.batch_id !== "all") query.append("batch_id", params.batch_id);
+    if (params.subject_id && params.subject_id !== "all") query.append("subject_id", params.subject_id);
+    if (params.start_date) query.append("start_date", params.start_date);
+    if (params.end_date) query.append("end_date", params.end_date);
+    if (params.search) query.append("search", params.search);
+
+    const qs = query.toString() ? `?${query.toString()}` : "";
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/attendance-records/student-summary/${qs}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+

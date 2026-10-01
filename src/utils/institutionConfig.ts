@@ -1,0 +1,194 @@
+import * as React from "react";
+export type InstitutionType = 'engineering' | 'medical' | 'school';
+
+interface InstitutionTerminology {
+  branch: string;
+  branches: string;
+  semester: string;
+  semesters: string;
+  hod: string;
+  usn: string;
+  coAttainment: string;
+  labs: string;
+  electives: string;
+  proctor: string;
+  mentoring: string;
+  admin: string;
+  admins: string;
+  activeBranches: string;
+  acrossBranches: string;
+  coordinators: string;
+}
+
+const TERMINOLOGY_MAP: Record<InstitutionType, InstitutionTerminology> = {
+  engineering: {
+    branch: 'Branch',
+    branches: 'Branches',
+    semester: 'Semester',
+    semesters: 'Semesters',
+    hod: 'Head of Department',
+    usn: 'USN',
+    coAttainment: 'CO Attainment',
+    labs: 'Labs',
+    electives: 'Electives',
+    proctor: 'Proctor',
+    mentoring: 'Mentoring',
+    admin: 'Admin',
+    admins: 'Admins',
+    activeBranches: 'Active branches',
+    acrossBranches: 'Across branches',
+    coordinators: 'Dept heads',
+  },
+  medical: {
+    branch: 'Course',
+    branches: 'Courses',
+    semester: 'Year/Phase',
+    semesters: 'Years/Phases',
+    hod: 'HOD',
+    usn: 'USN',
+    coAttainment: 'Competency',
+    labs: 'Clinical Postings',
+    electives: 'Electives',
+    proctor: 'Mentor',
+    admin: 'Admin',
+    admins: 'Admins',
+    activeBranches: 'Active courses',
+    acrossBranches: 'Across courses',
+    coordinators: 'Dept heads',
+  },
+  school: {
+    branch: 'Stream',
+    branches: 'Streams',
+    semester: 'Class',
+    semesters: 'Classes',
+    hod: 'Coordinator',
+    usn: 'Roll No',
+    admin: 'Admin',
+    admins: 'Admins',
+    coAttainment: 'Learning Outcomes',
+    labs: 'Practicals',
+    electives: 'Optional Subjects',
+    proctor: 'Class Teacher',
+    mentoring: 'Guidance',
+    activeBranches: 'Active streams',
+    acrossBranches: 'Across streams',
+    coordinators: 'Coordinators',
+  }
+};
+
+export const getInstitutionType = (): InstitutionType => {
+  try {
+    const userStr = sessionStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return (user.org_institution_type || 'engineering') as InstitutionType;
+    }
+  } catch (e) {
+    console.error('Failed to parse user from session storage', e);
+  }
+  return 'engineering';
+};
+
+export const getTerminology = (type?: InstitutionType): InstitutionTerminology => {
+  const currentType = type || getInstitutionType();
+  return TERMINOLOGY_MAP[currentType] || TERMINOLOGY_MAP.engineering;
+};
+
+export const getTerm = (key: keyof InstitutionTerminology, type?: InstitutionType): string => {
+  return getTerminology(type)[key];
+};
+
+export const hasFeature = (feature: 'labs' | 'electives' | 'coAttainment', type?: InstitutionType): boolean => {
+  const currentType = type || getInstitutionType();
+  if (currentType === 'school') {
+    if (feature === 'labs' || feature === 'coAttainment') {
+      return false; // Example: Schools might not use standard engineering lab/coAttainment features
+    }
+  }
+  if (currentType === 'medical') {
+    if (feature === 'coAttainment') {
+      return false; // Competency tracking is used, but CO attainment is engineering-specific
+    }
+  }
+  return true;
+};
+
+export const translateTerminology = (content: any): any => {
+  if (typeof content !== "string") return content;
+
+  let result = content;
+  const replacements = [
+    { pattern: /\bHead of Department\b/gi, key: "hod" },
+    { pattern: /\bHeads of Departments\b/gi, key: "hod" },
+    { pattern: /\bDept heads\b/gi, key: "hod" },
+    { pattern: /\bDepartment heads\b/gi, key: "hod" },
+    { pattern: /\bHOD\b/gi, key: "hod" },
+    { pattern: /\bHODs\b/gi, key: "hod" },
+    { pattern: /\bActive branches\b/gi, key: "activeBranches" },
+    { pattern: /\bAcross branches\b/gi, key: "acrossBranches" },
+    { pattern: /\bCoordinators\b/gi, key: "coordinators" },
+    { pattern: /\bStreams\b/gi, key: "branches" },
+    { pattern: /\bStream\b/gi, key: "branch" },
+    { pattern: /\bBranch\b/gi, key: "branch" },
+    { pattern: /\bBranches\b/gi, key: "branches" },
+    { pattern: /\bDepartment\b/gi, key: "branch" },
+    { pattern: /\bDepartments\b/gi, key: "branches" },
+    { pattern: /(?<!Library\s|Transport\s|Org\s)\bAdmin\b(?!istrat)/g, key: "admin" },
+    { pattern: /(?<!Library\s|Transport\s|Org\s)\bAdmins\b(?!istrat)/g, key: "admins" },
+    { pattern: /\bProctor\b/g, key: "proctor" },
+    { pattern: /\bProctors\b/g, key: "proctor" },
+    { pattern: /\bMentoring\b/g, key: "mentoring" },
+    { pattern: /\bSemesters\b/gi, key: "semesters" },
+    { pattern: /\bSemester\b/gi, key: "semester" },
+    { pattern: /\bElective\b/g, key: "electives" },
+    { pattern: /\bElectives\b/g, key: "electives" },
+    { pattern: /\bCO Attainment\b/g, key: "coAttainment" },
+    { pattern: /\bUSN\b/gi, key: "usn" },
+  ];
+
+  for (const { pattern, key } of replacements) {
+    if (pattern.test(result)) {
+      let replacement = getTerm(key as any);
+      if (pattern.source.includes("HODs") || pattern.source.includes("Heads of Departments") || pattern.source.includes("Dept heads") || pattern.source.includes("Department heads") || pattern.source.includes("Proctors") || pattern.source.includes("Electives")) {
+        replacement = replacement + "s";
+      }
+
+      result = result.replace(pattern, (match) => {
+        if (match === match.toLowerCase()) {
+          return replacement.toLowerCase();
+        }
+        if (key === 'hod' || key === 'usn') {
+          return replacement;
+        }
+        if (match === match.toUpperCase()) {
+          return replacement.toUpperCase();
+        }
+        if (match[0] === match[0].toUpperCase()) {
+          return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+        }
+        return replacement;
+      });
+    }
+  }
+
+  return result;
+};
+
+export const translateChildren = (children: React.ReactNode): React.ReactNode => {
+  if (typeof children === "string") {
+    return translateTerminology(children);
+  }
+  if (Array.isArray(children)) {
+    return React.Children.map(children, child => translateChildren(child));
+  }
+  if (React.isValidElement(children)) {
+    const props = children.props as any;
+    if (props && props.children) {
+      return React.cloneElement(children, {
+        ...props,
+        children: translateChildren(props.children),
+      } as any);
+    }
+  }
+  return children;
+};

@@ -1,0 +1,843 @@
+import { translateTerminology, getTerm } from "@/utils/institutionConfig";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { manageHostelStudents, manageRooms, exportHostelStudentsPdf, getHostelNames, getRoomsByHostelId } from '../../utils/hms_api';
+import { useToast } from '../../hooks/use-toast';
+import { Search, Filter, Edit2, CheckCircle2, XCircle, UserCircle2, Building2, Download, Loader2, Plus } from 'lucide-react';
+import { AdminPagination } from '../common/AdminPagination';
+import { SkeletonTable, SkeletonPageHeader } from '../ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { showSuccessAlert, showErrorAlert, showConfirmAlert } from '../../utils/sweetalert';
+import { useHMSContext } from "../../context/HMSContext";
+import { useAcademicContext, Batch, Branch, Semester } from "../../context/AcademicContext";
+import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
+import { API_BASE_URL } from '../../utils/config';
+
+interface HostelStudent {
+  id: number;
+  name: string;
+  usn: string;
+  user_email: string;
+  branch_name: string;
+  course_name: string;
+  room: number | null;
+  room_name?: string;
+  room_hostel_name?: string;
+  room_floor?: number;
+  room_allotted: boolean;
+  no_dues: boolean;
+  profile_picture?: string;
+}
+
+
+
+
+
+const getProfilePicUrl = (url?: string) => {
+  if (!url) return "";
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `${API_BASE_URL}${url}`;
+};
+
+const getInitials = (name: string) => {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
+
+const StudentManagement: React.FC = () => {
+  const navigate = useNavigate();
+  const { hostels, skeletonMode, fetchHostelsOnly } = useHMSContext();
+  const { batches, branches, getSemestersForBranch, loading: academicLoading, fetchBatches, fetchBranches } = useAcademicContext();
+
+  const [students, setStudents] = useState<HostelStudent[]>([]);
+  const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [floorsForHostel, setFloorsForHostel] = useState<number[]>([]);
+  const [roomsForHostel, setRoomsForHostel] = useState<any[]>([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<HostelStudent | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [isLoadingFloors, setIsLoadingFloors] = useState(false);
+  const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+  const [selectedHostelInDialog, setSelectedHostelInDialog] = useState<number | null>(null);
+  const [formData, setFormData] = useState({
+    room: null as number | null,
+    room_allotted: false,
+    no_dues: true
+  });
+  const [selectedFloorInDialog, setSelectedFloorInDialog] = useState<number | null>(null);
+  const [isBranchOpen, setIsBranchOpen] = useState(false);
+  const [isSemesterOpen, setIsSemesterOpen] = useState(false);
+  const [isFetchingHostels, setIsFetchingHostels] = useState(false);
+  const [selectedHostelName, setSelectedHostelName] = useState<string>('');
+
+  const getFloorFromRoomNumber = (roomNo: string): number => {
+    if (!roomNo) return 0;
+    const matches = roomNo.match(/\d+/g);
+    if (matches && matches.length > 0) {
+      const lastMatch = matches[matches.length - 1];
+      const num = parseInt(lastMatch);
+      // Room 101/201 -> 1/2, Room 1-99 -> Ground Floor (0)
+      if (num < 100) return 0;
+      return Math.floor(num / 100);
+    }
+    return 0;
+  };
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  const [nextPage, setNextPage] = useState<string | null>(null);
+  const [previousPage, setPreviousPage] = useState<string | null>(null);
+
+  // Filter state
+  const [filters, setFilters] = useState({
+    batch: '',
+    branch: '',
+    semester: ''
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+
+  const { toast } = useToast();
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportPDF = async () => {
+    setExporting(true);
+    try {
+      const blob = await exportHostelStudentsPdf({
+        batch: filters.batch,
+        branch: filters.branch,
+        semester: filters.semester,
+        search: appliedSearch
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Hostel_Students_${new Date().toISOString().split('T')[0]}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Success',
+        description: 'Hostel students PDF downloaded successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to export hostel students PDF',
+        variant: 'destructive'
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(searchQuery.trim());
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Clear search query when dropdown filters change
+  useEffect(() => {
+    if (filters.batch || filters.branch || filters.semester) {
+      setSearchQuery("");
+      setAppliedSearch("");
+    }
+  }, [filters.batch, filters.branch, filters.semester]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchStudents();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [currentPage, filters.batch, filters.branch, filters.semester, appliedSearch]);
+
+
+
+
+
+  const getFloorsForHostel = async (hostelId: number) => {
+    setIsLoadingFloors(true);
+    const hostel = hostels.find(h => h.id === hostelId);
+    const floorCount = hostel?.floor_count || 1;
+    setFloorsForHostel(Array.from({ length: floorCount }, (_, i) => i));
+    setIsLoadingFloors(false);
+  };
+
+  const getRoomsForHostel = async (hostelId: number, floor?: number) => {
+    if (floor === undefined || floor === null) {
+      setRoomsForHostel([]);
+      return;
+    }
+    setIsLoadingRooms(true);
+    try {
+      const response = await getRoomsByHostelId(hostelId, floor.toString());
+      if (response.success) {
+        const rooms = response.data?.rooms || response.rooms || response.results || [];
+        setRoomsForHostel(Array.isArray(rooms) ? rooms : []);
+      } else {
+        setRoomsForHostel([]);
+      }
+    } catch (error) {
+      console.error('Error getting rooms for hostel:', error);
+      setRoomsForHostel([]);
+    } finally {
+      setIsLoadingRooms(false);
+    }
+  };
+
+  const fetchSemesters = async (branchId?: string) => {
+
+    if (!branchId) {
+      setSemesters([]);
+      return;
+    }
+    const results = await getSemestersForBranch(parseInt(branchId));
+
+    setSemesters(results);
+    setIsSemesterOpen(true);
+  };
+
+  const fetchStudents = async (silent = false) => {
+    if (!appliedSearch.trim() && (!filters.batch || !filters.branch || !filters.semester)) {
+      setStudents([]);
+      setTotalCount(0);
+      return;
+    }
+
+    if (!silent) setLoading(true);
+    const params: Record<string, any> = {
+      page: currentPage,
+      page_size: pageSize,
+      search: appliedSearch
+    };
+
+    if (!appliedSearch.trim()) {
+      params.batch = filters.batch;
+      params.branch = filters.branch;
+      params.semester = filters.semester;
+    }
+
+    const response = await manageHostelStudents(undefined, undefined, 'GET', params);
+    if (response.success && response.results) {
+      setStudents(response.results);
+      setTotalCount(response.count || 0);
+      setNextPage(response.next);
+      setPreviousPage(response.previous);
+    }
+    if (!silent) setLoading(false);
+  };
+
+  // Remove the automatic floor setting from room change
+  // We want it to be manual and cascaded
+
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+    setCurrentPage(1);
+    if (key === 'branch') {
+      fetchSemesters(value);
+      setFilters((prev) => ({ ...prev, semester: '' }));
+    } else if (key === 'batch') {
+      setFilters((prev) => ({ ...prev, branch: '', semester: '' }));
+      if (value) {
+        fetchBranches().then(() => {
+          setIsBranchOpen(true);
+        });
+      }
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+
+    const result = await showConfirmAlert(
+      "Confirm Changes",
+      "Are you sure you want to update the hostel details for this student?",
+      "Yes, Save Changes"
+    );
+
+    if (!result.isConfirmed) return;
+
+    const response = await manageHostelStudents(formData, editingStudent.id, 'PATCH');
+    if (response.success) {
+      // Find the selected hostel and room names for manual update fallback if needed
+      const selectedHostel = hostels.find((h) => h.id === selectedHostelInDialog);
+      const selectedRoom = roomsForHostel.find((r) => r.id === formData.room);
+
+      const updatedStudent: HostelStudent = response.data ? {
+        ...editingStudent,
+        ...response.data
+      } : {
+        ...editingStudent,
+        ...formData,
+        room_name: selectedRoom?.name || (formData.room ? editingStudent.room_name : undefined),
+        room_hostel_name: selectedHostel?.name || (formData.room ? editingStudent.room_hostel_name : undefined)
+      };
+
+      // Handle room count updates if room changed
+      if (editingStudent.room !== formData.room) {
+        // Decrement old room count if it existed
+        if (editingStudent.room && editingStudent.room_hostel_name) {
+          const oldHostel = hostels.find((h) => h.name === editingStudent.room_hostel_name);
+          if (oldHostel) {
+            updateRoomStudentCount(oldHostel.id, editingStudent.room, -1);
+          }
+        }
+        // Increment new room count if it exists
+        if (formData.room && selectedHostelInDialog) {
+          updateRoomStudentCount(selectedHostelInDialog, formData.room, 1);
+        }
+      }
+
+      // If room was unassigned (room: null), clear room names
+      if (formData.room === null) {
+        updatedStudent.room_name = undefined;
+        updatedStudent.room_hostel_name = undefined;
+      }
+
+      // Update local state optimistically/instantly for real-time response
+      setStudents((prev) => prev.map((s) => s.id === editingStudent.id ? updatedStudent : s));
+
+      setIsDialogOpen(false);
+      showSuccessAlert("Success", "Student details updated successfully");
+    } else {
+      showErrorAlert("Error", response.message || "Failed to update student");
+    }
+  };
+
+  const handleEdit = async (student: HostelStudent) => {
+    setEditingStudent(student);
+    setFormData({
+      room: student.room,
+      room_allotted: student.room_allotted,
+      no_dues: student.no_dues
+    });
+
+    // Reset all dropdowns before populating
+    setFloorsForHostel([]);
+    setRoomsForHostel([]);
+    setSelectedFloorInDialog(null);
+    setSelectedHostelInDialog(null);
+    setSelectedHostelName('');
+    setIsDialogOpen(true);
+
+    if (student.room_hostel_name) {
+      setIsFetchingHostels(true);
+
+      // Resolve floor: use room_floor from API, or extract from room_name as fallback
+      let floorNum = student.room_floor;
+      if (typeof floorNum !== 'number' || isNaN(floorNum)) {
+        floorNum = student.room_name ? getFloorFromRoomNumber(student.room_name) : 0;
+      }
+
+      // Pre-populate floor and hostel immediately using cached list if available
+      const cachedHostel = hostels.find((h: any) => h.name === student.room_hostel_name);
+      if (cachedHostel) {
+        setSelectedHostelInDialog(cachedHostel.id);
+        setSelectedHostelName(cachedHostel.name);
+        const floors = Array.from({ length: cachedHostel.floor_count || 1 }, (_, i) => i);
+        setFloorsForHostel(floors);
+        if (student.room && typeof floorNum === 'number' && !isNaN(floorNum)) {
+          setSelectedFloorInDialog(floorNum);
+        }
+      }
+
+      const promises: Promise<any>[] = [
+        fetchHostelsOnly().then((freshHostels) => {
+          setIsFetchingHostels(false);
+          const hostel = freshHostels.find((h: any) => h.name === student.room_hostel_name);
+          if (hostel) {
+            setSelectedHostelInDialog(hostel.id);
+            setSelectedHostelName(hostel.name);
+            const floors = Array.from({ length: hostel.floor_count || 1 }, (_, i) => i);
+            setFloorsForHostel(floors);
+          }
+          return freshHostels;
+        })
+      ];
+
+      const resolvedHostelId = cachedHostel?.id;
+      if (resolvedHostelId && student.room && typeof floorNum === 'number' && !isNaN(floorNum)) {
+        promises.push(getRoomsForHostel(resolvedHostelId, floorNum));
+      }
+
+      await Promise.all(promises);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-primary/10 shadow-sm overflow-hidden">
+        <CardHeader id="hms-students-card" className="bg-muted/30 pb-4 border-b">
+          <div className="flex flex-col space-y-6">
+            <div className="flex justify-between items-start gap-4">
+              <div className="flex flex-col space-y-1">
+                <h2 className="text-xl sm:text-2xl font-semibold leading-none tracking-tight">Student Management</h2>
+                <p className="text-sm text-muted-foreground">Monitor and manage hostel student allocations and dues.</p>
+              </div>
+
+              {/* Desktop Export PDF Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPDF}
+                disabled={exporting || (!appliedSearch.trim() && (!filters.batch || !filters.branch || !filters.semester))}
+                className="hidden sm:flex items-center gap-1.5 h-9 text-xs bg-primary hover:bg-primary/90 text-white border-primary transition-all px-3 whitespace-nowrap shadow-sm"
+              >
+                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-4 h-4" />}
+                Export PDF
+              </Button>
+
+              {/* Mobile Export PDF Icon Button */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleExportPDF}
+                disabled={exporting || (!appliedSearch.trim() && (!filters.batch || !filters.branch || !filters.semester))}
+                className="flex sm:hidden h-9 w-9 items-center justify-center shrink-0 border border-input bg-background"
+              >
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              </Button>
+            </div>
+
+            {/* Row 1: Dropdowns */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[18px] sm:text-[16px] font-semibold mb-2 block">Batch</Label>
+                {skeletonMode ?
+                  <div className="w-full h-9 rounded-md bg-muted animate-pulse border" /> :
+
+                  <Select
+                    value={filters.batch}
+                    onValueChange={(v) => handleFilterChange('batch', v)}
+                    onOpenChange={(open) => {
+                      if (open) fetchBatches();
+                    }}
+                  >
+                    <SelectTrigger className="h-9 bg-background border-muted-foreground/20">
+                      <SelectValue placeholder="Select Batch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {batches.map((b) => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                }
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[18px] sm:text-[16px] font-semibold mb-2 block">{translateTerminology("Branch")}</Label>
+                {skeletonMode ?
+                  <div className="w-full h-9 rounded-md bg-muted animate-pulse border" /> :
+
+                  <Select
+                    disabled={!filters.batch}
+                    open={isBranchOpen}
+                    onOpenChange={(open) => {
+                      setIsBranchOpen(open);
+                      if (open) fetchBranches();
+                    }}
+                    value={filters.branch}
+                    onValueChange={(v) => handleFilterChange('branch', v)}>
+                    <SelectTrigger className="h-9 bg-background border-muted-foreground/20">
+                      <SelectValue placeholder={translateTerminology("Select Branch")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map((b) => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                }
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[18px] sm:text-[16px] font-semibold mb-2 block">{translateTerminology("Semester")}</Label>
+                {skeletonMode ?
+                  <div className="w-full h-9 rounded-md bg-muted animate-pulse border" /> :
+
+                  <Select
+                    disabled={!filters.branch}
+                    open={isSemesterOpen}
+                    onOpenChange={setIsSemesterOpen}
+                    value={filters.semester}
+                    onValueChange={(v) => handleFilterChange('semester', v)}>
+                    <SelectTrigger className="h-9 bg-background border-muted-foreground/20">
+                      <SelectValue placeholder={translateTerminology("Select Semester")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.isArray(semesters) && semesters.map((s) => <SelectItem key={s.id} value={s.id.toString()}>{translateTerminology("Semester")} {s.number}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                }
+              </div>
+            </div>
+
+            {/* Row 2: Search */}
+            <div className="flex flex-col md:flex-row items-end gap-4">
+              <div className="flex-1 w-full space-y-2">
+                <Label className="text-[18px] sm:text-[16px] font-semibold mb-2 block">Search Students</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  {skeletonMode ?
+                    <div className="h-9 w-full rounded-md bg-muted animate-pulse border" /> :
+
+                    <>
+                      <Input
+                        placeholder={`${translateTerminology("USN")}, Name, Email...`}
+                        className="h-9 pl-10 pr-12 bg-background border-muted-foreground/20 focus:border-primary/50 transition-colors"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)} />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery("")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </>
+
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading || skeletonMode ?
+            <div className="p-6"><SkeletonTable rows={10} columns={7} /></div> :
+
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-bold">{translateTerminology("USN")}</TableHead>
+                      <TableHead className="font-bold">Student Name</TableHead>
+                      <TableHead className="font-bold">Room Allocation</TableHead>
+                      <TableHead className="text-center font-bold">Status</TableHead>
+                      <TableHead className="text-right font-bold px-6">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.length > 0 ?
+                      students.map((student) =>
+                        <TableRow key={student.id} className="hover:bg-muted/30 transition-colors">
+                          <TableCell className="font-medium">{student.usn}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-semibold whitespace-nowrap">{student.name}</span>
+                              <span className="text-[12px] text-muted-foreground uppercase">{student.branch_name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {student.room_name ?
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{student.room_hostel_name} - {student.room_name}</span>
+                              </div> :
+
+                              <span className="text-xs text-muted-foreground italic">Not Assigned</span>
+                            }
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {student.room_allotted ?
+                              <Badge className="bg-green-500/10 text-green-600 border-green-200 hover:bg-green-500/20">Allotted</Badge> :
+                              <Badge variant="outline" className="text-muted-foreground border-dashed">Pending</Badge>
+                            }
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(student)} className="h-8 w-8 text-primary hover:bg-primary/10">
+                              <Edit2 size={14} />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ) :
+
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={5} className="p-6">
+                          <div className="flex flex-col items-center justify-center py-16 bg-muted/10 rounded-2xl border-2 border-dashed border-muted/50">
+                            <UserCircle2 className="w-12 h-12 text-muted-foreground/30 mb-4" />
+                            <p className="text-muted-foreground font-medium text-lg text-center px-4">
+                              {!appliedSearch.trim() && (!filters.batch || !filters.branch || !filters.semester) ?
+                                "Select filters or type a search query to view student records." :
+                                "No student records found."
+                              }
+                            </p>
+                            <p className="text-muted-foreground/60 text-sm text-center px-4 mt-1">
+                              {!appliedSearch.trim() && (!filters.batch || !filters.branch || !filters.semester) ?
+                                "Choose a batch and branch above, or enter search terms to retrieve students." :
+                                "We couldn't find any results. Please check your spelling or try different filters."
+                              }
+                            </p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    }
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          }
+        </CardContent>
+        {totalCount > pageSize && (
+          <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground px-6 py-4 border-t border-border mt-auto">
+            <div>
+              Showing {Math.min((currentPage - 1) * pageSize + 1, totalCount)} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} students
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1 || loading}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="bg-primary hover:bg-primary/90 text-white border-primary h-9 px-4 transition-all"
+              >
+                Previous
+              </Button>
+              <div className="flex items-center justify-center min-w-[2rem]">
+                <span className="text-sm font-semibold">{currentPage}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === Math.ceil(totalCount / pageSize) || loading}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="bg-primary hover:bg-primary/90 text-white border-primary h-9 px-4 transition-all"
+              >
+                Next
+              </Button>
+            </div>
+          </CardFooter>
+        )}
+      </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-[90vw] sm:max-w-xl rounded-xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <DialogHeader>
+            <DialogTitle>Update Student HMS Details</DialogTitle>
+          </DialogHeader>
+          {editingStudent &&
+            <div className="space-y-6 pt-4">
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex gap-4 items-center">
+                <Avatar className="w-12 h-12 border border-primary/10">
+                  {editingStudent.profile_picture ? (
+                    <AvatarImage
+                      src={getProfilePicUrl(editingStudent.profile_picture)}
+                      alt={editingStudent.name}
+                      className="object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-primary/10 text-primary font-bold text-lg">
+                    {getInitials(editingStudent.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col sm:grid sm:grid-cols-2 gap-x-8 gap-y-2 flex-1">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold uppercase opacity-60">Name</span>
+                    <span className="text-sm font-semibold mt-0.5 break-words">{editingStudent.name}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold uppercase opacity-60">USN</span>
+                    <span className="text-sm font-semibold mt-0.5 font-mono">{editingStudent.usn}</span>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[18px] sm:text-[16px] font-semibold mb-2 block">Assign Hostel</Label>
+                    <Select
+                      value={selectedHostelInDialog?.toString() || ''}
+                      onOpenChange={async (open) => {
+                        if (open) {
+                          setIsFetchingHostels(true);
+                          await fetchHostelsOnly();
+                          setIsFetchingHostels(false);
+                        }
+                      }}
+                      onValueChange={(v) => {
+                        const id = parseInt(v);
+                        setSelectedHostelInDialog(id);
+                        setSelectedHostelName(hostels.find(h => h.id === id)?.name || '');
+                        setSelectedFloorInDialog(null);
+                        setRoomsForHostel([]);
+                        getFloorsForHostel(id);
+                        setFormData((prev) => ({ ...prev, room: null, room_allotted: false }));
+                      }}
+                    >
+                      <SelectTrigger>
+                        <span className={
+                          (selectedHostelInDialog || editingStudent?.room_hostel_name)
+                            ? 'text-foreground text-sm'
+                            : 'text-muted-foreground text-sm'
+                        }>
+                          {selectedHostelName || editingStudent?.room_hostel_name || 'Select hostel'}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isFetchingHostels ? (
+                          <div className="p-3 text-center text-xs text-muted-foreground animate-pulse">Loading hostels...</div>
+                        ) : hostels.length > 0 ? (
+                          hostels.map((h) => <SelectItem key={h.id} value={h.id.toString()}>{h.name}</SelectItem>)
+                        ) : (
+                          <div className="p-3 text-center space-y-2" onPointerDown={(e) => e.stopPropagation()}>
+                            <p className="text-xs text-muted-foreground">No hostels found</p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="w-full text-[11px] font-semibold h-8 bg-primary hover:bg-primary/90 text-white"
+                              onPointerDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsDialogOpen(false);
+                                navigate('/hms/hostels', { state: { openAddHostel: true } });
+                              }}
+                            >
+                              Add Hostel
+                            </Button>
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-[18px] sm:text-[16px] font-semibold mb-2 block">Select Floor</Label>
+                      <Select
+                        value={selectedFloorInDialog !== null ? selectedFloorInDialog.toString() : (editingStudent?.room_floor !== undefined && editingStudent?.room_floor !== null ? editingStudent.room_floor.toString() : '')}
+                        onValueChange={(v) => {
+                          const floor = parseInt(v);
+                          if (isNaN(floor)) return;
+                          setSelectedFloorInDialog(floor);
+                          const hostelId = selectedHostelInDialog || (editingStudent?.room_hostel_name ? hostels.find(h => h.name === editingStudent.room_hostel_name)?.id : null);
+                          if (hostelId) {
+                            setRoomsForHostel([]);
+                            getRoomsForHostel(hostelId, floor);
+                          }
+                          setFormData((prev) => ({ ...prev, room: null, room_allotted: false }));
+                        }}
+                        disabled={!selectedHostelInDialog || isLoadingFloors}
+                      >
+                        <SelectTrigger>
+                          <span className={(selectedFloorInDialog !== null || editingStudent?.room_floor !== undefined) ? 'text-foreground text-sm' : 'text-muted-foreground text-sm'}>
+                            {isLoadingFloors ? (
+                              <span className="animate-pulse">Loading Floors...</span>
+                            ) : (selectedFloorInDialog !== null || (editingStudent?.room_floor !== undefined && editingStudent?.room_floor !== null)) ? (
+                              (() => {
+                                const fl = selectedFloorInDialog !== null ? selectedFloorInDialog : editingStudent!.room_floor;
+                                return fl === 0 ? 'Ground Floor' : `${fl}${fl === 1 ? 'st' : fl === 2 ? 'nd' : fl === 3 ? 'rd' : 'th'} Floor`;
+                              })()
+                            ) : (
+                              'Choose Floor'
+                            )}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {floorsForHostel.length > 0 ?
+                            floorsForHostel.map((floor) =>
+                              <SelectItem key={floor} value={floor.toString()}>
+                                {floor === 0 ? 'Ground Floor' : `${floor}${floor === 1 ? 'st' : floor === 2 ? 'nd' : floor === 3 ? 'rd' : 'th'} Floor`}
+                              </SelectItem>
+                            ) :
+
+                            <SelectItem value="none" disabled>No floors found</SelectItem>
+                          }
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center mb-2">
+                        <Label className="text-[18px] sm:text-[16px] font-semibold block">Assign Room</Label>
+                        {!!(selectedHostelInDialog && selectedFloorInDialog !== null && !isNaN(selectedFloorInDialog)) && (
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs text-primary font-semibold hover:underline"
+                            onClick={() => {
+                              setIsDialogOpen(false);
+                              navigate('/hms/rooms', {
+                                state: {
+                                  openAddRoom: true,
+                                  hostelId: selectedHostelInDialog,
+                                  floor: selectedFloorInDialog
+                                }
+                              });
+                            }}
+                          >
+                            <Plus className="w-3 h-3 mr-1 inline" /> Add Room
+                          </Button>
+                        )}
+                      </div>
+                        <Select value={formData.room?.toString() || ''} onValueChange={(v) => {
+                        const newRoom = v === '' ? null : parseInt(v);
+                        setFormData((prev) => ({ ...prev, room: newRoom, room_allotted: !!newRoom }));
+                      }} disabled={(!selectedHostelInDialog && !editingStudent?.room_hostel_name) || (selectedFloorInDialog === null && editingStudent?.room_floor === undefined) || isLoadingRooms}>
+                        <SelectTrigger>
+                          <span className={(formData.room || (formData.room == editingStudent?.room && editingStudent?.room_name)) ? 'text-foreground text-sm' : 'text-muted-foreground text-sm'}>
+                            {isLoadingRooms ? (
+                              <span className="animate-pulse">Loading Rooms...</span>
+                            ) : (formData.room || (formData.room == editingStudent?.room && editingStudent?.room_name)) ? (
+                              (() => {
+                                const selectedRoomObj = roomsForHostel.find((r) => r.id == formData.room);
+                                if (selectedRoomObj) {
+                                  return `${selectedRoomObj.name} (${selectedRoomObj.student_count}/${selectedRoomObj.capacity})`;
+                                }
+                                return (formData.room == editingStudent?.room ? editingStudent?.room_name : '') || 'Choose Room';
+                              })()
+                            ) : (
+                              'Choose Room'
+                            )}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[250px]">
+                          {roomsForHostel.length > 0 ? (
+                            roomsForHostel.map((r) =>
+                              <SelectItem key={r.id} value={r.id.toString()} disabled={r.student_count >= r.capacity && editingStudent?.room !== r.id}>
+                                {r.name} ({r.student_count}/{r.capacity})
+                              </SelectItem>
+                            )
+                          ) : (
+                            <SelectItem value="none" disabled>No rooms found</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="bg-primary hover:bg-primary/90 px-8">Save Changes</Button>
+                </div>
+              </form>
+            </div>
+          }
+        </DialogContent>
+      </Dialog>
+    </div>);
+
+};
+
+export default StudentManagement;

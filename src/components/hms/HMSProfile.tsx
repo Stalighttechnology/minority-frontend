@@ -1,0 +1,657 @@
+import { Switch } from "@/components/ui/switch";
+import { handleNotificationToggle, checkNotificationPermission } from "../../utils/notificationHelper";
+import HelpLearningCard from "../common/HelpLearningCard";
+import LoginActivity from "../common/LoginActivity";
+import GoogleIntegrationTab from "../common/GoogleIntegrationTab";
+import { useState, useEffect, useRef } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Textarea } from "../ui/textarea";
+import { useTheme } from "../../context/ThemeContext";
+import { showConfirmAlert, showSuccessAlert, showErrorAlert } from "../../utils/sweetalert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
+import { Eye, EyeOff, Camera , Trash} from 'lucide-react';
+import { SkeletonCard } from "../ui/skeleton";
+import { fetchWithTokenRefresh } from "../../utils/authService";
+import { API_ENDPOINT } from "../../utils/config";
+import { useHMSContext } from "../../context/HMSContext";
+import { uploadFileViaBackendProxy } from "../../utils/common_api";
+
+interface User {
+  user_id?: string;
+  username?: string;
+  email?: string;
+  role?: string;
+  first_name?: string;
+  last_name?: string;
+  mobile_number?: string;
+  address?: string;
+  bio?: string;
+  designation?: string;
+}
+
+interface Profile {
+  first_name: string;
+  last_name: string;
+  email: string;
+  mobile_number: string;
+  address: string;
+  bio: string;
+  designation: string;
+  profile_picture: string;
+
+  library_id?: string;
+  vtu_staff_id?: string;
+  aicte_id?: string;
+}
+
+const HMSProfile = ({ user: propUser, setError }: { user?: User; setError?: (error: string | null) => void; }) => {
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<Profile>({
+    first_name: "",
+    last_name: "",
+    email: "",
+    mobile_number: "",
+    address: "",
+    bio: "",
+    designation: "",
+    profile_picture: ""
+  ,
+    library_id: "",
+    vtu_staff_id: "",
+    aicte_id: ""
+  });
+  const { theme } = useTheme();
+  const { skeletonMode } = useHMSContext();
+  const [fetchedUser, setFetchedUser] = useState<User | null>(null);
+  const skipFetch = useRef(false);
+
+  // Change password states
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [passwordData, setPasswordData] = useState({ current_password: "", new_password: "", confirm_password: "" });
+  const [showPasswords, setShowPasswords] = useState({ current: false, next: false, confirm: false });
+  const passwordDialogContentRef = useRef<HTMLDivElement | null>(null);
+  const urlParams = new URLSearchParams(window.location.search);
+  const defaultTab = urlParams.get("google_connected") !== null ? "integrations" : "personal";
+  const [activeTab, setActiveTab] = useState<'personal' | 'contact' | 'help' | 'settings' | 'activity' | 'integrations'>(defaultTab as any);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
+  const [googleConnectLoading, setGoogleConnectLoading] = useState(false);
+
+  const getRoleDisplayName = (r: string) => {
+    if (!r) return "—";
+    if (r === 'warden') return 'Warden';
+    if (r === 'hms_admin') return 'HMS Admin';
+    return r.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  };
+
+  useEffect(() => {
+    checkNotificationPermission(setNotificationsEnabled);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'integrations' && googleConnected === null) {
+      setGoogleConnectLoading(true);
+      fetchWithTokenRefresh(`${API_ENDPOINT}/integrations/google/status/`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.connected !== undefined) setGoogleConnected(data.connected);
+        })
+        .catch(err => console.error("Failed to fetch google status", err))
+        .finally(() => setGoogleConnectLoading(false));
+    }
+  }, [activeTab]);
+
+  // Profile picture upload states
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+  const resetUpload = () => { setIsUploadingPicture(false); };
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (skipFetch.current) {
+        skipFetch.current = false;
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/profile/`);
+        const result = await response.json();
+
+        if (result.success && result.profile) {
+          const payload = result.profile;
+          setProfile({
+            first_name: payload.first_name || "",
+            last_name: payload.last_name || "",
+            email: payload.email || "",
+            mobile_number: payload.mobile_number || "",
+            address: payload.address || "",
+            bio: payload.bio || "",
+            designation: payload.designation || "HMS Manager",
+            profile_picture: payload.profile_picture ? (payload.profile_picture.startsWith('http') ? payload.profile_picture : `${API_ENDPOINT.replace('/api', '')}${payload.profile_picture}`) : "",
+            library_id: payload.library_id || "",
+            vtu_staff_id: payload.vtu_staff_id || "",
+            aicte_id: payload.aicte_id || ""
+          });
+        } else {
+          showErrorAlert("Error", result.message || "Failed to fetch profile");
+        }
+      } catch (err) {
+
+        showErrorAlert("Error", "Network error");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [propUser]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    if (name === "mobile_number") {
+      const cleaned = value.replace(/\D/g, "");
+      if (cleaned.length <= 10) {
+        setProfile((prev) => ({ ...prev, [name]: cleaned }));
+      }
+      return;
+    }
+    setProfile((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveProfile = async () => {
+    const idRegex = /^[a-zA-Z0-9\-_ ]*$/;
+    if (profile.library_id && !idRegex.test(profile.library_id.trim())) {
+      showErrorAlert("Error", "Library ID must be alphanumeric");
+      setLoading(false);
+      return;
+    }
+    if (profile.vtu_staff_id && !idRegex.test(profile.vtu_staff_id.trim())) {
+      showErrorAlert("Error", "VTU Staff ID must be alphanumeric");
+      setLoading(false);
+      return;
+    }
+    if (profile.aicte_id && !idRegex.test(profile.aicte_id.trim())) {
+      showErrorAlert("Error", "AICTE ID must be alphanumeric");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (!profile.first_name.trim()) throw new Error("First name is required");
+      if (!profile.email.trim()) throw new Error("Email is required");
+      if (profile.mobile_number && profile.mobile_number.length !== 10) {
+        throw new Error("Mobile number must be exactly 10 digits");
+      }
+
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/profile/update/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile)
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        const resData = result.data || result.profile || {};
+        setProfile((prev) => ({
+          ...prev,
+          ...resData,
+          library_id: resData.library_id !== undefined ? resData.library_id : prev.library_id,
+          vtu_staff_id: resData.vtu_staff_id !== undefined ? resData.vtu_staff_id : prev.vtu_staff_id,
+          aicte_id: resData.aicte_id !== undefined ? resData.aicte_id : prev.aicte_id
+        }));
+        const respData = result.data || result.profile || {};
+        setProfile((prev) => ({
+          ...prev,
+          first_name: respData.first_name || prev.first_name,
+          last_name: respData.last_name || prev.last_name,
+          email: respData.email || prev.email,
+          mobile_number: respData.mobile_number || prev.mobile_number,
+          address: respData.address || prev.address,
+          bio: respData.bio || prev.bio,
+          designation: respData.designation || prev.designation,
+          library_id: respData.library_id ?? prev.library_id,
+          vtu_staff_id: respData.vtu_staff_id ?? prev.vtu_staff_id,
+          aicte_id: respData.aicte_id ?? prev.aicte_id
+        }));
+        showSuccessAlert("Success", "Profile saved successfully");
+        setEditing(false);
+        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+        sessionStorage.setItem("user", JSON.stringify({ ...userData, ...respData }));
+      } else {
+        showErrorAlert("Error", result.message || "Failed to save profile");
+      }
+    } catch (err: any) {
+      showErrorAlert("Error", err.message || "Network error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  
+  const handleDeleteProfilePicture = async () => {
+    const confirmed = await showConfirmAlert('Remove Photo', 'Are you sure you want to remove your profile picture?', 'Remove');
+    if (!confirmed.isConfirmed) return;
+
+    try {
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/profile/delete-picture/`, {
+        method: 'DELETE'
+      });
+      const res = await response.json();
+      
+      if (res.success) {
+        setProfile((prev: any) => ({ ...prev, profile_picture: "", profile_image: "" }));
+        const userStr = sessionStorage.getItem("user");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          delete user.profile_picture;
+          delete user.profile_image;
+          sessionStorage.setItem("user", JSON.stringify(user));
+          window.dispatchEvent(new Event("userProfileUpdated"));
+        }
+        showSuccessAlert("Success", "Profile picture removed!");
+      } else {
+        showErrorAlert("Error", res.message || "Failed to remove profile picture");
+      }
+    } catch (err) {
+      showErrorAlert("Error", "Network error while removing picture");
+    }
+  };
+
+  const handleProfilePictureSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 50 * 1024) {
+      showErrorAlert('Error', 'Profile picture must be less than 50KB');
+      e.target.value = '';
+      return;
+    }
+    uploadProfilePictureDirectly(file);
+  };
+
+  const uploadProfilePictureDirectly = async (file: File) => {
+    try {
+      setIsUploadingPicture(true);
+      // Upload to R2 via backend proxy
+      const fileUrl = await uploadFileViaBackendProxy(file, 'profiles');
+
+      if (fileUrl) {
+        // Finalize update with backend
+        const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/profile/upload-picture/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile_picture_url: fileUrl })
+        });
+        const result = await response.json();
+
+        if (result?.success) {
+          setProfile((p) => ({ ...p, profile_picture: fileUrl }));
+          const currentUserData = JSON.parse(sessionStorage.getItem("user") || '{}');
+          currentUserData.profile_picture = fileUrl;
+          sessionStorage.setItem("user", JSON.stringify(currentUserData));
+          window.dispatchEvent(new Event("userProfileUpdated"));
+          showSuccessAlert('Success', 'Profile picture updated successfully!');
+        } else {
+          showErrorAlert('Error', result.message || 'Failed to update backend with new photo');
+        }
+      } else {
+        showErrorAlert('Error', 'Failed to upload image to R2');
+      }
+    } catch (err) {
+      console.error("Profile picture upload error:", err);
+      showErrorAlert('Error', 'Failed to upload profile picture');
+    } finally {
+      resetUpload();
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordData.current_password || !passwordData.new_password || !passwordData.confirm_password) {
+      showErrorAlert("Missing fields", "Please fill in current, new and confirm password fields.");
+      return;
+    }
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      showErrorAlert("Password mismatch", "New passwords don't match");
+      return;
+    }
+
+    try {
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/profile/change-password/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(passwordData)
+      });
+      const result = await response.json();
+      if (result.success) {
+        setShowPasswordDialog(false);
+        setPasswordData({ current_password: '', new_password: '', confirm_password: '' });
+        showSuccessAlert('Password changed', 'Updated successfully.');
+      } else {
+        showErrorAlert('Error', result.message || 'Failed to change password');
+      }
+    } catch (err) {
+      showErrorAlert('Error', 'Failed to change password');
+    }
+  };
+
+  const isSkeleton = loading && !profile.first_name || skeletonMode;
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'personal':
+        return (
+          <div className="space-y-4 sm:space-y-5 md:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+              <div className="w-full">
+                <label className={`block text-[18px] sm:text-[16px] mb-1.5 sm:mb-2 font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>First Name</label>
+                {isSkeleton ?
+                  <div className="h-9 sm:h-10 w-full rounded-md bg-muted animate-pulse border" /> :
+
+                  <Input name="first_name" value={profile.first_name} onChange={handleChange} disabled={true} placeholder="First name" className="text-sm h-9 sm:h-10 w-full" />
+                }
+              </div>
+              <div className="w-full">
+                <label className={`block text-[18px] sm:text-[16px] mb-1.5 sm:mb-2 font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Last Name</label>
+                {isSkeleton ?
+                  <div className="h-9 sm:h-10 w-full rounded-md bg-muted animate-pulse border" /> :
+
+                  <Input name="last_name" value={profile.last_name} onChange={handleChange} disabled={true} placeholder="Last name" className="text-sm h-9 sm:h-10 w-full" />
+                }
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div>
+                <label className={`block text-[18px] sm:text-[16px] mb-1.5 sm:mb-2 font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Email</label>
+                {isSkeleton ?
+                  <div className="h-9 sm:h-10 w-full rounded-md bg-muted animate-pulse border" /> :
+
+                  <Input name="email" value={profile.email} onChange={handleChange} disabled={true} placeholder="Email address" className="text-sm h-9 sm:h-10 w-full" />
+                }
+              </div>
+              <div>
+                <label className={`block text-[18px] sm:text-[16px] mb-1.5 sm:mb-2 font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Mobile</label>
+                {isSkeleton ?
+                  <div className="h-9 sm:h-10 w-full rounded-md bg-muted animate-pulse border" /> :
+
+                  <Input name="mobile_number" value={profile.mobile_number} onChange={handleChange} disabled={!editing} maxLength={10} placeholder="10-digit mobile" className="text-sm h-9 sm:h-10 w-full" />
+                }
+              </div>
+            </div>
+
+            <div className="w-full">
+              <label className={`block text-[18px] sm:text-[16px] mb-1.5 sm:mb-2 font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Designation</label>
+              {isSkeleton ?
+                <div className="h-9 sm:h-10 w-full rounded-md bg-muted animate-pulse border" /> :
+
+                <Input name="designation" value={profile.designation} onChange={handleChange} disabled={true} placeholder="Designation" className="text-sm h-9 sm:h-10 w-full" />
+              }
+            </div>
+          
+            <div className="pt-4 border-t mt-4 col-span-1 sm:col-span-2">
+              <h4 className="text-sm font-semibold mb-3 text-gray-900 dark:text-foreground">Institutional IDs</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div>
+                  <label htmlFor="library_id" className="block text-xs mb-1.5 font-semibold text-gray-900 dark:text-foreground">Library ID</label>
+                  <Input id="library_id" name="library_id" value={profile.library_id} onChange={handleChange} disabled={!editing || loading} placeholder="e.g. LIB12345" className="text-sm h-9 w-full" />
+                </div>
+                <div>
+                  <label htmlFor="vtu_staff_id" className="block text-xs mb-1.5 font-semibold text-gray-900 dark:text-foreground">VTU Staff ID</label>
+                  <Input id="vtu_staff_id" name="vtu_staff_id" value={profile.vtu_staff_id} onChange={handleChange} disabled={!editing || loading} placeholder="e.g. VTU98765" className="text-sm h-9 w-full" />
+                </div>
+                <div>
+                  <label htmlFor="aicte_id" className="block text-xs mb-1.5 font-semibold text-gray-900 dark:text-foreground">AICTE ID</label>
+                  <Input id="aicte_id" name="aicte_id" value={profile.aicte_id} onChange={handleChange} disabled={!editing || loading} placeholder="e.g. 1-12345678" className="text-sm h-9 w-full" />
+                </div>
+              </div>
+            </div>
+</div>);
+
+
+
+      case 'integrations':
+        return (
+          <div className="animate-in fade-in duration-300">
+            <h3 className={`font-semibold text-base mb-4 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Integrations</h3>
+            <GoogleIntegrationTab 
+              googleConnected={googleConnected}
+              setGoogleConnected={setGoogleConnected}
+              googleConnectLoading={googleConnectLoading}
+            />
+          </div>
+        );
+
+      case 'settings':
+        return (
+          <div className="animate-in fade-in duration-300">
+            <h3 className={`font-semibold text-base mb-4 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Settings</h3>
+            <div className={`flex items-center justify-between p-4 border rounded-lg ${theme === 'dark' ? 'bg-card border-input' : 'bg-white border-gray-200'}`}>
+              <div className="space-y-0.5">
+                <Label className="text-base font-medium">Push Notifications</Label>
+                <p className={`text-sm ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>Receive real-time alerts for attendance, leaves, exams, and more.</p>
+              </div>
+              <Switch checked={notificationsEnabled} onCheckedChange={(checked) => handleNotificationToggle(checked, setNotificationsEnabled)} />
+            </div>
+          </div>
+        );
+
+      case 'help':
+        return (
+          <div className="animate-in fade-in duration-300">
+            <HelpLearningCard />
+          </div>
+        );
+      case 'activity':
+        return (
+          <div>
+            <h3 className={`font-semibold text-base mb-4 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Login Activity</h3>
+            <div className="mt-3">
+              <LoginActivity />
+            </div>
+          </div>
+        );
+      case 'contact':
+        return (
+          <div className="space-y-4 sm:space-y-5">
+            <div>
+              <label className={`block text-[18px] sm:text-[16px] mb-1.5 sm:mb-2 font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Address</label>
+              {isSkeleton ?
+                <div className="h-20 w-full rounded-md bg-muted animate-pulse border" /> :
+
+                <Textarea name="address" value={profile.address} onChange={handleChange} disabled={!editing} rows={3} className="text-sm w-full" />
+              }
+            </div>
+            <div>
+              <label className={`block text-[18px] sm:text-[16px] mb-1.5 sm:mb-2 font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Bio</label>
+              {isSkeleton ?
+                <div className="h-24 w-full rounded-md bg-muted animate-pulse border" /> :
+
+                <Textarea name="bio" value={profile.bio} onChange={handleChange} disabled={!editing} rows={4} className="text-sm w-full" />
+              }
+            </div>
+          </div>);
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="flex justify-center items-start">
+      <Card className={`w-full max-w-none mx-auto my-2 ${theme === 'dark' ? 'bg-card text-foreground' : 'bg-white text-gray-900'}`}>
+        <CardHeader id="hms-profile-card" className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 border-b">
+          <div className="flex-1 min-w-0">
+            <CardTitle className={`sm:text-2xl text-xl font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Profile Information</CardTitle>
+            <p className={`text-sm sm:text-sm mt-1 ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>View and update your administrative profile</p>
+          </div>
+
+          <div className="flex flex-row items-center gap-2 w-full sm:w-auto sm:ml-auto">
+            <Button
+              size="sm"
+              onClick={() => { if (editing) handleSaveProfile(); else setEditing(true); }}
+              variant="outline"
+              className={`flex-1 sm:flex-none w-full sm:w-auto text-sm text-white border transition-colors ${
+                editing 
+                  ? 'bg-emerald-600 border-emerald-600 hover:bg-emerald-700 hover:border-emerald-700 hover:text-white' 
+                  : 'bg-primary border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white'
+              }`}
+              disabled={loading}>
+              {editing ? loading ? 'Saving Profile...' : 'Save Profile' : 'Edit Profile'}
+            </Button>
+            <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+              <DialogTrigger asChild>
+                <Button className="flex-1 sm:flex-none w-full sm:w-auto text-sm sm:text-md px-3 sm:px-4 py-2 h-auto bg-primary text-white border-primary hover:bg-primary/90">Change Password</Button>
+              </DialogTrigger>
+              <DialogContent ref={passwordDialogContentRef} className="w-[calc(100vw-1.5rem)] sm:w-full max-w-[420px] rounded-xl sm:rounded-2xl" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+                <DialogHeader>
+                  <DialogTitle>Change Password</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Current Password</Label>
+                    <div className="relative">
+                      <Input
+                        type={showPasswords.current ? 'text' : 'password'}
+                        value={passwordData.current_password}
+                        onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
+                        className="pr-10" />
+
+                      <button type="button" onClick={() => setShowPasswords((prev) => ({ ...prev, current: !prev.current }))} className="absolute inset-y-0 right-0 px-3 text-muted-foreground">
+                        {showPasswords.current ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>New Password</Label>
+                    <div className="relative">
+                      <Input
+                        type={showPasswords.next ? 'text' : 'password'}
+                        value={passwordData.new_password}
+                        onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
+                        className="pr-10" />
+
+                      <button type="button" onClick={() => setShowPasswords((prev) => ({ ...prev, next: !prev.next }))} className="absolute inset-y-0 right-0 px-3 text-muted-foreground">
+                        {showPasswords.next ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Confirm Password</Label>
+                    <div className="relative">
+                      <Input
+                        type={showPasswords.confirm ? 'text' : 'password'}
+                        value={passwordData.confirm_password}
+                        onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
+                        className="pr-10" />
+
+                      <button type="button" onClick={() => setShowPasswords((prev) => ({ ...prev, confirm: !prev.confirm }))} className="absolute inset-y-0 right-0 px-3 text-muted-foreground">
+                        {showPasswords.confirm ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>Cancel</Button>
+                    <Button className="bg-primary text-white" onClick={handleChangePassword}>Update</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+
+        <CardContent className="px-6 pb-6 pt-2 space-y-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 md:gap-6 lg:gap-8 items-start">
+            <div className="col-span-1 flex flex-col items-center">
+              <div className="relative mb-3 mt-3 sm:mb-4 flex-shrink-0 group cursor-pointer">
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden">
+                  <Avatar className="w-full h-full">
+                    <AvatarImage src={profile.profile_picture || undefined} alt={`${profile.first_name} ${profile.last_name}`} />
+                    <AvatarFallback className="bg-primary text-white text-lg sm:text-2xl font-semibold">
+                      {(profile.first_name?.[0] || '') + (profile.last_name?.[0] || '')}
+                    </AvatarFallback>
+                  </Avatar>
+                  {(editing || !profile?.profile_picture) && (
+                    <label 
+                      htmlFor="profile-picture-upload" 
+                      className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center text-white cursor-pointer"
+                    >
+                      <Camera className="h-5 w-5 mb-1 transform scale-75 group-hover:scale-100 group-hover:animate-bounce transition-transform duration-300" />
+                      <span className="text-[9px] font-semibold tracking-wider uppercase">Change</span>
+                    </label>
+                  )}
+                </div>
+                {(editing || !profile?.profile_picture) && (
+                  <label htmlFor="profile-picture-upload" className="absolute bottom-0 right-0 bg-primary hover:bg-primary/90 text-white p-2 rounded-full cursor-pointer transition-colors shadow-lg md:hidden">
+                    <Camera className="h-4 w-4" />
+                  </label>
+                )}
+                <input id="profile-picture-upload" type="file" accept="image/*" onChange={handleProfilePictureSelect} className="hidden" />
+                {editing && profile?.profile_picture && (
+                  <button
+                    onClick={handleDeleteProfilePicture}
+                    className="absolute top-0 right-0 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full cursor-pointer transition-colors shadow-lg"
+                    title="Remove Photo"
+                  >
+                    <Trash className="h-4 w-4" />
+                  </button>
+                )}
+
+              </div>
+
+              {isUploadingPicture && (
+                <div className="mb-2 text-center w-full px-4">
+                  <p className="text-xs text-gray-500 animate-pulse">Uploading...</p>
+                </div>
+              )}
+
+              <div className="text-xl sm:text-lg font-semibold text-center mb-1">{profile.first_name} {profile.last_name}</div>
+              <div className={`text-base sm:text-sm ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>HMS Manager</div>
+
+              <div className="w-full mt-4 sm:mt-6 flex flex-col">
+                <h4 className="text-sm font-semibold mb-2">Quick Info</h4>
+                <div className={`border rounded-lg p-3 ${theme === 'dark' ? 'bg-card border-input' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="space-y-3">
+                    <div className="flex flex-col">
+                      <span className="text-[14px] font-semibold text-muted-foreground mb-1">Role</span>
+                      <span className={`text-base p-1.5 rounded-lg ${theme === 'dark' ? 'bg-accent' : 'bg-purple-100 text-purple-700'}`}>{getRoleDisplayName(propUser?.role || JSON.parse(sessionStorage.getItem("user") || "{}").role || "")}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[14px] font-semibold text-muted-foreground mb-1">Email</span>
+                      <span className={`text-base break-all p-1.5 rounded-lg ${theme === 'dark' ? 'bg-accent' : 'bg-purple-100 text-purple-700'}`}>{profile.email || '—'}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[14px] font-semibold text-muted-foreground mb-1">Mobile</span>
+                      <span className={`text-base p-1.5 rounded-lg ${theme === 'dark' ? 'bg-accent' : 'bg-purple-100 text-purple-700'}`}>{profile.mobile_number || '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-span-1 sm:col-span-2 lg:col-span-3 w-full flex flex-col h-full">
+              <div className="flex gap-2 mb-4 border-b pb-2 overflow-x-auto custom-scrollbar">
+                <button onClick={() => setActiveTab('personal')} className={`px-4 py-2 rounded-md transition-colors font-semibold text-sm sm:text-sm whitespace-nowrap ${activeTab === 'personal' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:bg-accent'}`}>Personal Info</button>
+                <button onClick={() => setActiveTab('contact')} className={`px-4 py-2 rounded-md transition-colors font-semibold text-sm sm:text-sm whitespace-nowrap ${activeTab === 'contact' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:bg-accent'}`}>Contact & Bio</button>
+                <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 rounded-md transition-colors font-semibold text-sm sm:text-sm whitespace-nowrap ${activeTab === 'settings' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:bg-accent'}`}>Settings</button>
+                <button onClick={() => setActiveTab('integrations')} className={`px-4 py-2 rounded-md transition-colors font-semibold text-sm sm:text-sm whitespace-nowrap ${activeTab === 'integrations' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:bg-accent'}`}>Integrations</button>
+                <button onClick={() => setActiveTab('help')} className={`px-4 py-2 rounded-md transition-colors font-semibold text-sm sm:text-sm whitespace-nowrap ${activeTab === 'help' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:bg-accent'}`}>Help & Learning</button>
+                <button onClick={() => setActiveTab('activity')} className={`px-4 py-2 rounded-md transition-colors font-semibold text-sm sm:text-sm whitespace-nowrap ${activeTab === 'activity' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:bg-accent'}`}>Login Activity</button>
+              </div>
+              <div className={`p-4 sm:p-6 rounded-lg border min-h-[300px] ${theme === 'dark' ? 'bg-card border-input' : 'bg-gray-50 border-gray-200'}`}>
+                {renderTabContent()}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>);
+
+};
+
+export default HMSProfile;

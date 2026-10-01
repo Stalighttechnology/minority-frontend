@@ -1,0 +1,201 @@
+import { Step } from 'react-joyride';
+
+export const hmsTour: Step[] = [
+  {
+    target: 'body',
+    title: 'Welcome to StalightCampus HMS!',
+    content:
+      "Let's show you around your Hostel Management System dashboard to help you manage hostels, rooms, students, and staff.",
+    placement: 'center' as const,
+    disableBeacon: true,
+  },
+  {
+    target: '#hms-stats-grid',
+    title: 'Overview Statistics',
+    content:
+      'View total hostels, rooms, student counts, active wardens, and overall occupancy rate in real-time.',
+    placement: 'bottom' as const,
+    disableBeacon: false,
+    route: '/hms',
+  },
+  {
+    target: '#hms-occupancy-matrix',
+    title: 'Room Occupancy Matrix',
+    content:
+      'Monitor availability per hostel and floor visually. Color-coded grids indicate full, partial, or empty occupancy.',
+    placement: 'top' as const,
+    disableBeacon: false,
+    route: '/hms',
+  },
+  {
+    target: '#sidebar-hostels',
+    title: 'Hostel Management',
+    content:
+      'Add new hostels, allocate wardens and caretakers, and view the list of registered hostels.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/hostels',
+  },
+  {
+    target: '#sidebar-rooms',
+    title: 'Room Management',
+    content:
+      'Add rooms, edit capacity and room types, and check current residents.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/rooms',
+  },
+  {
+    target: '#sidebar-enrollment',
+    title: 'Staff Enrollment',
+    content:
+      'Register new wardens and caretakers into the system with their professional credentials.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/enrollment',
+  },
+  {
+    target: '#sidebar-students',
+    title: 'Student Management',
+    content:
+      'Filter and search registered hostel students, assign them to rooms, and manage no-dues clearance.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/students',
+  },
+  {
+    target: '#sidebar-outside-students',
+    title: 'Outside Students',
+    content:
+      'Manage records for non-hostel students utilizing campus amenities.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/outside-students',
+  },
+  {
+    target: '#sidebar-student-meals',
+    title: "Today's Menu",
+    content:
+      "Check today's scheduled meals, timings, and dietary info for the hostel.",
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/student-meals',
+  },
+  {
+    target: '#sidebar-menu-management',
+    title: 'Mess Menu Management',
+    content:
+      'Plan breakfast, lunch, snacks, and dinner menu items weekly or schedule special menus.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/menu-management',
+  },
+  {
+    target: '#sidebar-issues',
+    title: 'Issue Tracking',
+    content:
+      'Track and update complaints, maintenance requests, and student issues.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/issues',
+  },
+  {
+    target: '#sidebar-visitor-logs',
+    title: 'Visitor Logs',
+    content:
+      'Monitor visitor logs, check visit purposes, and export visitor records as PDF.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/visitor_logs',
+  },
+  {
+    target: '#sidebar-staff',
+    title: 'Staff Directory',
+    content:
+      'View, update, and manage the list of registered wardens and caretakers.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/staff',
+  },
+  {
+    target: '#sidebar-announcement-management',
+    title: 'Announcement Management',
+    content:
+      'Create and manage announcements for hostel residents and staff.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/announcement-management',
+  },
+  {
+    target: '#sidebar-schedule-meeting',
+    title: 'Schedule Meeting',
+    content:
+      'Schedule and organize meetings across hostel staff.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/schedule-meeting',
+  },
+  {
+    target: '#sidebar-manage-warden-leaves',
+    title: 'Leave Requests',
+    content:
+      'Review and manage leave requests submitted by assigned staff members.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/manage-warden-leaves',
+  },
+  {
+    target: '#sidebar-apply-leave',
+    title: 'Apply Leave',
+    content:
+      'Submit leave requests and track your application history.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/apply-leave',
+  },
+  {
+    target: '#sidebar-my-attendance',
+    title: 'My Attendance',
+    content:
+      'Check your personal daily attendance logs and records.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/my-attendance',
+  },
+  {
+    target: '#sidebar-holiday-calendar',
+    title: 'Calendar',
+    content:
+      'View institutional holiday calendar and scheduled events.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/holiday-calendar',
+  },
+  {
+    target: '#sidebar-reimbursements',
+    title: 'Reimbursements & Claims',
+    content:
+      'Submit and monitor status of expense reimbursement claims.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/reimbursements',
+  },
+  {
+    target: '#sidebar-my-payroll',
+    title: 'My Salary & Payroll',
+    content:
+      'View your monthly salary statements, pay slips, and statutory deductions.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/my-payroll',
+  },
+  {
+    target: '#sidebar-profile',
+    title: 'HMS Profile',
+    content:
+      'Manage your personal details, contact information, and change passwords.',
+    placement: 'right' as const,
+    disableBeacon: false,
+    route: '/hms/profile',
+  },
+];

@@ -1,0 +1,2516 @@
+import { translateTerminology, getTerm, getInstitutionType } from "@/utils/institutionConfig";
+import { downloadFile } from "../../utils/downloadHelper";
+import { useRef, useState, useEffect } from "react";
+import { Checkbox } from "../ui/checkbox";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter
+} from
+  "../ui/card";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { SkeletonTable } from "../ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from
+  "../ui/dialog";
+import { Pencil, Trash2, UploadCloud, Upload, Loader2, FileDown, Search, X } from "lucide-react";
+import { fetchWithTokenRefresh } from "../../utils/authService";
+import { API_ENDPOINT } from "../../utils/config";
+// Removed chart imports; performance chart is no longer shown on this page
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
+import Swal from "sweetalert2";
+import { showSuccessAlert, showErrorAlert } from "../../utils/sweetalert";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue
+} from
+  "../ui/select";
+import { manageStudents, getSemesters, manageSections, manageProfile, manageBatches, getHODStudentBootstrap, manageSemesters } from "../../utils/hod_api";
+import { useHODBootstrap } from "../../context/HODBootstrapContext";
+import { useTheme } from "../../context/ThemeContext";
+
+const mockChartData = [
+  { subject: "CS101", attendance: 85, marks: 78, semester: "4th Semester" },
+  { subject: "CS102", attendance: 92, marks: 88, semester: "4th Semester" },
+  { subject: "CS103", attendance: 75, marks: 69, semester: "4th Semester" }];
+
+interface Semester {
+  id: string;
+  number: number;
+}
+
+interface Batch {
+  id: string;
+  name: string;
+  start_year: number;
+  end_year: number;
+}
+
+interface Section {
+  id: string;
+  name: string;
+  semester_id: string;
+}
+
+interface Student {
+  usn: string;
+  name: string;
+  email: string;
+  section: string;
+  semester: string;
+  cycle?: string;
+  phone?: string;
+  mode_of_admission?: string;
+}
+
+const StudentManagement = () => {
+  const { theme } = useTheme();
+  const [state, setState] = useState({
+    students: [] as Student[],
+    search: "",
+    appliedSearch: "",
+    sectionFilter: "",
+    semesterFilter: "",
+    cycleFilter: "",
+    selectedStudent: null as Student | null,
+    confirmDelete: false,
+    confirmBulkDelete: false,
+    isDeleting: false,
+    selectedStudentUsns: [] as string[],
+    editDialog: false,
+    addStudentModal: false,
+    editForm: { usn: "", name: "", email: "", section: "", semester: "", cycle: "", phone: "", mode_of_admission: "" },
+    uploadErrors: [] as string[],
+    uploadedCount: 0,
+    updatedCount: 0,
+    droppedFileName: null as string | null,
+    selectedFile: null as File | null,
+    manualForm: { usn: "", name: "", email: "", section: "", semester: "", batch: "", cycle: "", phone: "", mode_of_admission: "" },
+    bulkForm: { batch: "", semester: "", section: "", mode_of_admission: "", cycle: "" },
+    currentPage: 1,
+    totalPages: 1,
+    selectedSemester: "",
+    semesters: [] as Semester[],
+    manualSections: [] as Section[],
+    listSections: [] as Section[],
+    editSections: [] as Section[],
+    batches: [] as Batch[],
+    branchId: "",
+    chartData: mockChartData,
+    isLoading: false,
+    isEditSectionsLoading: false,
+    manualErrors: {} as Record<string, string>,
+    manualSemesters: [] as Semester[],
+    totalStudents: 0,
+    pageSize: 50,
+    successMessage: ""
+  });
+
+  const getSemesterName = (number: number) => {
+    if (getInstitutionType() === 'school') {
+      return `Class ${number}`;
+    }
+    let suffix = "th";
+    if (number % 10 === 1 && number % 100 !== 11) suffix = "st";
+    else if (number % 10 === 2 && number % 100 !== 12) suffix = "nd";
+    else if (number % 10 === 3 && number % 100 !== 13) suffix = "rd";
+    return `${number}${suffix} Semester`;
+  };
+
+  const bootstrap = useHODBootstrap();
+  const [sectionsCache, setSectionsCache] = useState<Record<string, Section[]>>({});
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+  const [isAddSemesterOpen, setIsAddSemesterOpen] = useState(false);
+  const [newSemesterNumber, setNewSemesterNumber] = useState("");
+  const [addingSemester, setAddingSemester] = useState(false);
+  const [isAddSectionOpen, setIsAddSectionOpen] = useState(false);
+  const [newSectionName, setNewSectionName] = useState("");
+  const [addingSection, setAddingSection] = useState(false);
+
+  const handleOpenAddSection = () => {
+    setNewSectionName("");
+    setIsAddSectionOpen(true);
+  };
+
+  const handleAddSection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSectionName || !["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"].includes(newSectionName)) {
+      showErrorAlert("Error", "Please select a valid section (A-Z)");
+      return;
+    }
+    setAddingSection(true);
+    try {
+      const semId = getSemesterId(state.manualForm.semester);
+      if (!semId) {
+        showErrorAlert("Error", "Please select a semester first.");
+        return;
+      }
+      const response = await manageSections({
+        action: "create",
+        name: newSectionName,
+        semester_id: semId,
+        branch_id: state.branchId
+      }, "POST");
+
+      if (response.success) {
+        const createdId = response.data?.id || response.data?.section_id || String(Date.now());
+        const newSec = { id: String(createdId), name: newSectionName, semester_id: semId };
+        const cacheKey = semId || "ALL";
+        const currentCached = sectionsCache[cacheKey] || [];
+        const updatedSections = [...currentCached, newSec].filter((v, i, a) => a.findIndex(t => t.name === v.name) === i).sort((a, b) => a.name.localeCompare(b.name));
+
+        setSectionsCache(prev => ({ ...prev, [cacheKey]: updatedSections }));
+        updateState({
+          manualSections: updatedSections,
+          manualForm: { ...state.manualForm, section: newSectionName }
+        });
+        setIsAddSectionOpen(false);
+      } else {
+        showErrorAlert("Error", response.message || "Failed to create section");
+      }
+    } catch (err: any) {
+      showErrorAlert("Error", "An error occurred while creating section");
+    } finally {
+      setAddingSection(false);
+    }
+  };
+
+  const handleOpenAddSemester = () => {
+    setNewSemesterNumber("");
+    setIsAddSemesterOpen(true);
+  };
+
+  const handleAddSemester = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSemesterNumber || isNaN(Number(newSemesterNumber)) || Number(newSemesterNumber) < 1 || Number(newSemesterNumber) > 20) {
+      showErrorAlert("Error", "Please enter a valid semester number (1-20)");
+      return;
+    }
+    setAddingSemester(true);
+    try {
+      const response = await manageSemesters({
+        action: "create",
+        number: Number(newSemesterNumber),
+        branch_id: state.branchId
+      });
+      if (response.success) {
+        const returnedSemesters = (response as any).semesters || (response.data && Array.isArray((response.data as any).semesters) ? (response.data as any).semesters : null);
+        if (returnedSemesters && Array.isArray(returnedSemesters)) {
+          const mappedSemesters = returnedSemesters.map((s: any) => ({ id: s.id.toString(), number: s.number }));
+          updateState({
+            semesters: mappedSemesters,
+            manualForm: { ...state.manualForm, semester: `${newSemesterNumber}th Semester` }
+          });
+        } else {
+          const createdId = response.data?.semester_id || response.data?.id || String(Date.now());
+          const newSem = { id: String(createdId), number: Number(newSemesterNumber) };
+          updateState({
+            semesters: [...state.semesters, newSem].sort((a, b) => a.number - b.number),
+            manualForm: { ...state.manualForm, semester: `${newSemesterNumber}th Semester` }
+          });
+        }
+        setIsAddSemesterOpen(false);
+      } else {
+        showErrorAlert("Error", response.message || "Failed to create semester");
+      }
+    } catch (err: any) {
+      showErrorAlert("Error", "An error occurred while creating semester");
+    } finally {
+      setAddingSemester(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setDownloadingPDF(true);
+    try {
+      let queryParams = `?semester_id=${state.semesterFilter}&section_id=${state.sectionFilter}`;
+      if (state.search.trim()) {
+        queryParams += `&search=${encodeURIComponent(state.search.trim())}`;
+      }
+
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/students/export-pdf/${queryParams}`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Student_List_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showSuccessAlert("Success", "Student list PDF exported successfully");
+      } else {
+        const result = await response.json().catch(() => ({}));
+        showErrorAlert("Error", result.message || "Failed to export PDF");
+      }
+    } catch (err) {
+      showErrorAlert("Error", "Network error while exporting PDF");
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
+  // Helper to update state
+  const updateState = (newState: Partial<typeof state>) => {
+    setState((prev) => ({ ...prev, ...newState }));
+  };
+
+  // Fetch students
+  const fetchStudents = async (branchId: string, page: number = 1, pageSize: number = 50, search: string = '', sectionId: string = '', forceRefresh: boolean = false) => {
+    if (!search && (state.semesterFilter === "" || state.sectionFilter === "")) {
+      updateState({ students: [], totalStudents: 0, totalPages: 0, isLoading: false });
+      return;
+    }
+    try {
+      const params: any = {
+        branch_id: branchId,
+        page: page,
+        page_size: pageSize
+      };
+      if (search) params.search = search;
+      if (sectionId) params.section_id = sectionId;
+      if (forceRefresh) params.force_refresh = true;
+      if (state.cycleFilter) params.cycle = state.cycleFilter;
+      const studentRes = await manageStudents(params, "GET");
+      // Normalize different possible response shapes from backend
+      // 1) { success: true, results: [...], count }
+      // 2) { success: true, data: { students: [...] } }
+      // 3) plain array
+      let results: any[] = [];
+      let count = 0;
+      if (studentRes == null) {
+        results = [];
+      } else if ((studentRes as any).results && Array.isArray((studentRes as any).results)) {
+        results = (studentRes as any).results;
+        count = (studentRes as any).count || results.length;
+      } else if ((studentRes as any).data && Array.isArray((studentRes as any).data.students)) {
+        results = (studentRes as any).data.students;
+        count = (studentRes as any).count || results.length;
+      } else if (Array.isArray(studentRes)) {
+        results = studentRes as any[];
+        count = results.length;
+      } else if ((studentRes as any).success === false) {
+        // Backend returned an error
+        updateState({ uploadErrors: [...state.uploadErrors, `Students API: ${(studentRes as any).message || 'Error fetching students'}`] });
+        results = [];
+      } else {
+        // Unknown shape but try to extract 'data' array
+        if ((studentRes as any).data && Array.isArray((studentRes as any).data)) {
+          results = (studentRes as any).data;
+          count = results.length;
+        } else {
+          results = [];
+        }
+      }
+
+      // Map results into UI student shape
+      const students = results.map((s: any) => ({
+        usn: s.usn,
+        name: s.name,
+        email: s.email,
+        phone: s.phone,
+        section: s.section || 'Unknown',
+        semester: s.semester || 'Unknown',
+        cycle: s.cycle,
+        mode_of_admission: s.mode_of_admission
+      }));
+      const totalPages = (studentRes as ManageStudentsResponse).total_pages || Math.ceil(count / pageSize);
+      updateState({ students, totalStudents: count, currentPage: page, totalPages, selectedStudentUsns: [] });
+    } catch (err) {
+      updateState({ uploadErrors: [...state.uploadErrors, "Failed to fetch students"] });
+    }
+  };
+
+  // Fetch batches
+  const fetchBatches = async () => {
+    try {
+      const batchRes = await manageBatches();
+      if (batchRes.success && batchRes.batches) {
+        updateState({
+          batches: batchRes.batches,
+          manualForm: { ...state.manualForm, batch: "" }
+        });
+      } else {
+        updateState({ uploadErrors: [...state.uploadErrors, `Batches API: ${batchRes.message || "No batches found"}`] });
+      }
+    } catch (err) {
+      updateState({ uploadErrors: [...state.uploadErrors, "Failed to fetch batches"] });
+    }
+  };
+
+  // Fetch initial data
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      updateState({ isLoading: true });
+      try {
+        const boot = await getHODStudentBootstrap(['profile', 'semesters', 'batches']);
+        if (!boot.success || !boot.data?.profile?.branch_id) {
+          throw new Error(boot.message || "Failed to bootstrap student management");
+        }
+        const branchId = boot.data.profile.branch_id;
+        updateState({ branchId });
+
+        // Batches
+        if (Array.isArray(boot.data.batches)) {
+          const batches = boot.data.batches.map((b: any) => ({ ...b, id: b.id.toString() }));
+          updateState({ batches, manualForm: { ...state.manualForm, batch: "" } });
+        } else {
+          await fetchBatches();
+        }
+
+        // Semesters
+        if (Array.isArray(boot.data.semesters) && boot.data.semesters.length > 0) {
+          const semesters = boot.data.semesters.map((s: any) => ({ id: s.id.toString(), number: s.number }));
+          updateState({ semesters, selectedSemester: "", manualForm: { ...state.manualForm, semester: "" } });
+          // Manual sections will be populated by useEffect based on semester selection
+        } else {
+          updateState({ uploadErrors: [...state.uploadErrors, "No semesters found"] });
+        }
+
+        // Sections are now fetched lazily on semester selection
+
+
+        // Students are now fetched separately via fetchStudents call above
+
+        // Performance fetch removed (chart not shown on this page)
+      } catch (err) {
+
+        updateState({ uploadErrors: [...state.uploadErrors, "Failed to connect to backend"] });
+      } finally {
+        updateState({ isLoading: false });
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  // Handle search
+  const handleSearch = () => {
+    if (state.branchId) {
+      updateState({ appliedSearch: state.search.trim(), currentPage: 1 });
+    }
+  };
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateState({ appliedSearch: state.search.trim(), currentPage: 1 });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [state.search]);
+
+  // Fetch students when filters, appliedSearch, or page changes
+  useEffect(() => {
+    if (state.branchId) {
+      const sectionId = state.sectionFilter === "All" || state.sectionFilter === "" ? "" : state.sectionFilter;
+      if (state.appliedSearch || (state.semesterFilter !== "" && state.sectionFilter !== "")) {
+        fetchStudents(state.branchId, state.currentPage, state.pageSize, state.appliedSearch, sectionId);
+      } else {
+        updateState({ students: [], totalStudents: 0, totalPages: 0, isLoading: false });
+      }
+    }
+  }, [state.branchId, state.currentPage, state.appliedSearch, state.semesterFilter, state.sectionFilter, state.cycleFilter]);
+
+  const forceCloseDropdowns = () => {
+    const escEvent = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      code: 'Escape',
+      keyCode: 27,
+      which: 27,
+      bubbles: true,
+      cancelable: true
+    });
+    document.activeElement?.dispatchEvent(escEvent);
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
+
+  // Fetch sections when semester changes in Add Student Manually
+  useEffect(() => {
+    let active = true;
+    let timer: NodeJS.Timeout;
+    if (state.branchId && state.manualForm.semester) {
+      const semesterId = getSemesterId(state.manualForm.semester);
+      const cacheKey = semesterId || "ALL";
+      const cached = sectionsCache[cacheKey];
+      if (cached) {
+        updateState({
+          manualSections: cached,
+          manualForm: { ...state.manualForm, section: state.manualForm.section || "" }
+        });
+        if (!state.manualForm.section && active) {
+          timer = setTimeout(() => {
+            forceCloseDropdowns();
+            const trigger = document.getElementById("section-select-trigger");
+            if (trigger) trigger.click();
+          }, 150);
+        }
+      } else if (semesterId) {
+        manageSections({ branch_id: state.branchId, semester_id: semesterId }, "GET").then((res: any) => {
+          if (res.success && res.data && active) {
+            const sections = res.data.map((s: any) => ({ id: String(s.id), name: s.name, semester_id: String(s.semester_id) }));
+            setSectionsCache(prev => ({ ...prev, [cacheKey]: sections }));
+          }
+        });
+      }
+    } else if (state.branchId) {
+      updateState({ manualSections: [], manualForm: { ...state.manualForm, section: "" } });
+    }
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [state.branchId, state.manualForm.semester, sectionsCache]);
+
+  // Fetch sections when semester changes in Bulk Upload Modal
+  useEffect(() => {
+    let active = true;
+    let timer: NodeJS.Timeout;
+    if (state.branchId && state.bulkForm.semester) {
+      const semesterId = getSemesterId(state.bulkForm.semester);
+      const cacheKey = semesterId || "ALL";
+      const cached = sectionsCache[cacheKey];
+      if (cached) {
+        const needsUpdate = state.manualSections !== cached || !state.bulkForm.section;
+        if (needsUpdate) {
+          updateState({
+            manualSections: cached,
+            bulkForm: { ...state.bulkForm, section: state.bulkForm.section || "" }
+          });
+        }
+        if (!state.bulkForm.section && active) {
+          timer = setTimeout(() => {
+            forceCloseDropdowns();
+            const trigger = document.getElementById("bulk-section-select-trigger");
+            if (trigger) trigger.click();
+          }, 150);
+        }
+      } else if (semesterId) {
+        manageSections({ branch_id: state.branchId, semester_id: semesterId }, "GET").then((res: any) => {
+          if (res.success && res.data && active) {
+            const sections = res.data.map((s: any) => ({ id: String(s.id), name: s.name, semester_id: String(s.semester_id) }));
+            setSectionsCache(prev => ({ ...prev, [cacheKey]: sections }));
+          }
+        });
+      }
+    } else if (state.branchId && state.bulkForm.section !== "") {
+      updateState({ bulkForm: { ...state.bulkForm, section: "" } });
+    }
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [state.branchId, state.bulkForm.semester, sectionsCache, state.manualSections]);
+
+  // Automatically trigger bulk semester select when batch changes
+  useEffect(() => {
+    if (state.bulkForm.batch !== "") {
+      const timer = setTimeout(() => {
+        forceCloseDropdowns();
+        const trigger = document.getElementById("bulk-semester-select-trigger");
+        if (trigger) trigger.click();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [state.bulkForm.batch]);
+
+  // Automatically trigger bulk mode of admission select when section changes
+  useEffect(() => {
+    if (state.bulkForm.section !== "" && state.bulkForm.semester !== "") {
+      const timer = setTimeout(() => {
+        forceCloseDropdowns();
+        const trigger = document.getElementById("bulk-mode-select-trigger");
+        if (trigger) trigger.click();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [state.bulkForm.section]);
+
+  // Automatically trigger bulk cycle select when mode of admission changes
+  useEffect(() => {
+    if (state.bulkForm.mode_of_admission !== "" && state.bulkForm.section !== "") {
+      const showCycle = state.bulkForm.semester && getSemesterNumber(state.bulkForm.semester) <= 2;
+      if (showCycle) {
+        const timer = setTimeout(() => {
+          forceCloseDropdowns();
+          const trigger = document.getElementById("bulk-cycle-select-trigger");
+          if (trigger) trigger.click();
+        }, 150);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [state.bulkForm.mode_of_admission]);
+
+
+
+  // Automatically trigger semester select when mode of admission changes from empty to selected
+  useEffect(() => {
+    if (state.manualForm.mode_of_admission !== "") {
+      const timer = setTimeout(() => {
+        forceCloseDropdowns();
+        const trigger = document.getElementById("semester-select-trigger");
+        if (trigger) trigger.click();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [state.manualForm.mode_of_admission]);
+
+  // Automatically trigger batch select when section changes from empty to selected
+  useEffect(() => {
+    if (state.manualForm.section !== "" && state.manualForm.semester !== "") {
+      const timer = setTimeout(() => {
+        forceCloseDropdowns();
+        const trigger = document.getElementById("batch-select-trigger");
+        if (trigger) trigger.click();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [state.manualForm.section]);
+
+  // Automatically trigger cycle select when batch changes from empty to selected (for semesters 1 and 2)
+  useEffect(() => {
+    if (state.manualForm.batch !== "" && state.manualForm.section !== "") {
+      const showCycle = state.manualForm.semester && getSemesterNumber(state.manualForm.semester) <= 2;
+      if (showCycle) {
+        const timer = setTimeout(() => {
+          forceCloseDropdowns();
+          const trigger = document.getElementById("cycle-select-trigger");
+          if (trigger) trigger.click();
+        }, 150);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [state.manualForm.batch]);
+
+  // Fetch sections when semester changes in Student List filter
+  useEffect(() => {
+    if (state.branchId && state.semesterFilter !== "") {
+      const cached = sectionsCache[state.semesterFilter];
+      if (cached) {
+        updateState({ listSections: cached });
+      } else {
+        manageSections({ branch_id: state.branchId, semester_id: state.semesterFilter }, "GET").then((res: any) => {
+          if (res.success && res.data) {
+            const sections = res.data.map((s: any) => ({ id: String(s.id), name: s.name, semester_id: String(s.semester_id) }));
+            setSectionsCache(prev => ({ ...prev, [state.semesterFilter]: sections }));
+          }
+        });
+      }
+    } else if (state.branchId) {
+      const allSections = Object.values(sectionsCache).flat();
+      const uniqueSections = allSections.filter((section, index, self) =>
+        index === self.findIndex((s) => s.id === section.id)
+      );
+      updateState({ listSections: uniqueSections });
+    }
+  }, [state.branchId, state.semesterFilter, sectionsCache]);
+
+  // Automatically trigger Section filter when a semester is chosen in the Student List filter
+  useEffect(() => {
+    if (state.semesterFilter !== "" && state.listSections.length > 0 && state.sectionFilter === "") {
+      const timer = setTimeout(() => {
+        forceCloseDropdowns();
+        const trigger = document.getElementById("list-section-select-trigger");
+        if (trigger) trigger.click();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [state.semesterFilter, state.listSections]);
+
+  // Clear search query when dropdown filters change in Student List filter
+  useEffect(() => {
+    if (state.semesterFilter !== "" || state.sectionFilter !== "") {
+      updateState({ search: "", appliedSearch: "" });
+    }
+  }, [state.semesterFilter, state.sectionFilter]);
+
+  // Fetch sections when semester changes in Edit Dialog
+  useEffect(() => {
+    if (state.editDialog && state.branchId && state.editForm.semester) {
+      const semesterId = getSemesterId(state.editForm.semester);
+      const semesterNumber = getSemesterNumber(state.editForm.semester);
+      if (semesterId) {
+        const cacheKey = semesterId || "ALL";
+        const cached = sectionsCache[cacheKey];
+        if (cached) {
+          updateState({
+            editSections: cached,
+            editForm: {
+              ...state.editForm,
+              section: state.editForm.section || cached[0]?.name || "",
+              cycle: semesterNumber <= 2 ? state.editForm.cycle : ""
+            }
+          });
+        } else {
+          manageSections({ branch_id: state.branchId, semester_id: semesterId }, "GET").then((res: any) => {
+            if (res.success && res.data) {
+              const sections = res.data.map((s: any) => ({ id: String(s.id), name: s.name, semester_id: String(s.semester_id) }));
+              setSectionsCache(prev => ({ ...prev, [cacheKey]: sections }));
+            }
+          });
+        }
+      } else {
+        updateState({ editSections: [], editForm: { ...state.editForm, section: "", cycle: "" } });
+      }
+    }
+  }, [state.branchId, state.editForm.semester, state.editDialog, sectionsCache]);
+
+  // Map semester and section names to IDs
+  const getSemesterId = (semesterName: string) =>
+    state.semesters.find((s) => `${s.number}th Semester` === semesterName)?.id || "";
+
+  const getSemesterNumber = (semesterName: string) =>
+    state.semesters.find((s) => `${s.number}th Semester` === semesterName)?.number || 0;
+
+  const formatSemesterDisplay = (student: Student) => {
+    const semesterNumber = getSemesterNumber(student.semester);
+    if (semesterNumber <= 2 && student.cycle) {
+      return `${student.semester} (${student.cycle} cycle)`;
+    }
+    return student.semester;
+  };
+
+  const getSectionId = (sectionName: string, sections: Section[]) =>
+    sections.find((s) => s.name === sectionName)?.id || "";
+
+  const getBatchId = (batchName: string) =>
+    state.batches.find((b) => b.name === batchName)?.id || "";
+
+  // Handle file selection (just stores the file, doesn't process)
+  const handleFileSelect = (file: File) => {
+    updateState({
+      selectedFile: file,
+      droppedFileName: file.name,
+      uploadErrors: [],
+      uploadedCount: 0,
+      updatedCount: 0
+    });
+  };
+
+  // Handle student enrollment (processes the selected file)
+  const handleEnrollStudents = async () => {
+    if (!state.selectedFile) {
+      showErrorAlert("Error", "Please select a file first");
+      return;
+    }
+
+    if (!state.bulkForm.semester || !state.bulkForm.section || !state.bulkForm.batch || !state.bulkForm.mode_of_admission) {
+      showErrorAlert("Error", "Please select batch, semester, section, and mode of admission before enrolling");
+      return;
+    }
+
+    // Check cycle validation for semesters 1 and 2 (engineering/medical only)
+    if (getInstitutionType() !== 'school') {
+      const semesterNumber = getSemesterNumber(state.bulkForm.semester);
+      if (semesterNumber <= 2 && !state.bulkForm.cycle) {
+        showErrorAlert("Error", "Please select cycle for semesters 1 and 2");
+        return;
+      }
+    }
+
+    updateState({ isLoading: true, uploadErrors: [] });
+
+    const file = state.selectedFile;
+    const reader = new FileReader();
+    const extension = file.name.split(".").pop()?.toLowerCase();
+
+    reader.onload = async (e) => {
+      try {
+        const result = e.target?.result;
+        if (!result) {
+          showErrorAlert("Error", "No data in file");
+          updateState({ uploadedCount: 0, updatedCount: 0, isLoading: false });
+          return;
+        }
+
+        let data: any[] = [];
+        if (extension === "csv") {
+          const parsed = Papa.parse(result as string, { header: true, skipEmptyLines: true });
+          data = parsed.data;
+        } else if (extension === "xls" || extension === "xlsx") {
+          const workbook = XLSX.read(result, { type: "binary" });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          data = XLSX.utils.sheet_to_json(worksheet);
+        } else {
+          showErrorAlert("Error", "Unsupported file type (use CSV, XLS, or XLSX)");
+          updateState({
+            uploadedCount: 0,
+            updatedCount: 0
+          });
+          return;
+        }
+
+        // Validate and sanitize
+        const errors: string[] = [];
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        const selectedBatchId = getBatchId(state.bulkForm.batch);
+        const selectedSemesterId = getSemesterId(state.bulkForm.semester);
+        const selectedSectionId = getSectionId(state.bulkForm.section, state.manualSections);
+
+        if (!selectedBatchId) {
+          showErrorAlert("Error", "Invalid batch selected. Please select a valid batch.");
+          updateState({ uploadedCount: 0, updatedCount: 0, isLoading: false });
+          return;
+        }
+
+        const bulkData = data.
+          map((entry, index) => {
+            const usn = String(entry.usn || entry.USN || "").trim();
+            const name = String(entry.name || entry.Name || "").trim();
+            const email = String(entry.email || entry.Email || "").trim();
+            const parent_name = String(entry.parent_name || entry.ParentName || "").trim() || "";
+            const parent_contact = String(entry.parent_contact || entry.ParentContact || "").trim() || "";
+            const emergency_contact = String(entry.emergency_contact || entry.EmergencyContact || "").trim() || "";
+            const phone = String(entry.phone || entry.Phone || entry.contact || entry.Contact || entry.contact_number || entry.ContactNumber || "").trim() || "";
+            const blood_group = String(entry.blood_group || entry.BloodGroup || "").trim() || "";
+            const mode_of_admission = String(entry.mode_of_admission || entry.ModeOfAdmission || state.bulkForm.mode_of_admission || "KCET").trim();
+            const date_of_admission = entry.date_of_admission || entry.DateOfAdmission || new Date().toLocaleDateString('sv-SE');
+            const row = index + 2;
+
+            if (!usn || !name) {
+              // Skip rows with missing required fields instead of erroring
+              return null;
+            }
+            // Email validation (optional)
+            if (email && !emailRegex.test(email)) {
+              errors.push(`Row ${row}: Invalid email "${email}"`);
+              return null;
+            }
+
+            const cycle = String(entry.cycle || entry.Cycle || "").trim().toUpperCase();
+
+            // Validate cycle for semesters 1 and 2 - use UI selected cycle if available (engineering/medical only)
+            const semesterNumber = getSemesterNumber(state.bulkForm.semester);
+            const selectedCycle = state.bulkForm.cycle;
+
+            if (getInstitutionType() !== 'school') {
+              if (semesterNumber <= 2) {
+                // Use cycle from UI selection, or from CSV if provided
+                const finalCycle = selectedCycle || cycle;
+                if (!finalCycle || !['P', 'C'].includes(finalCycle)) {
+                  errors.push(`Row ${row}: Cycle (P or C) is required for semester ${semesterNumber}. Please select cycle above or include in CSV.`);
+                  return null;
+                }
+              } else if (cycle) {
+                errors.push(`Row ${row}: Cycle can only be set for semesters 1 and 2`);
+                return null;
+              }
+            }
+
+            return {
+              usn,
+              name,
+              email,
+              cycle: semesterNumber <= 2 ? selectedCycle || cycle : undefined,
+              phone: phone || undefined,
+              parent_name,
+              parent_contact,
+              emergency_contact,
+              blood_group,
+              mode_of_admission,
+              date_of_admission,
+              semester_id: selectedSemesterId,
+              section_id: selectedSectionId,
+              batch_id: selectedBatchId,
+              branch_id: state.branchId
+            };
+          }).
+          filter(Boolean);
+
+        if (bulkData.length === 0) {
+          updateState({ uploadErrors: ["No valid students found in the file. Please ensure USN and Name columns are filled for at least one row."], uploadedCount: 0, updatedCount: 0, isLoading: false });
+          return;
+        }
+
+        if (errors.length > 0) {
+          updateState({ uploadErrors: errors, uploadedCount: 0, updatedCount: 0, isLoading: false });
+          return;
+        }
+
+        // Send to backend
+        const res = await manageStudents(
+          {
+            action: "bulk_update",
+            branch_id: state.branchId,
+            semester_id: selectedSemesterId,
+            section_id: selectedSectionId,
+            batch_id: selectedBatchId,
+            bulk_data: bulkData
+          },
+          "POST"
+        );
+
+        if (res.success) {
+          const createdCount = res.data?.created_count || 0;
+          const updatedCount = res.data?.updated_count || 0;
+          updateState({
+            uploadedCount: createdCount,
+            updatedCount: updatedCount,
+            uploadErrors: [],
+            droppedFileName: null,
+            selectedFile: null,
+            currentPage: 1,
+            isLoading: false
+            // Modal stays open so user can see the result summary
+          });
+          const parts: string[] = [];
+          if (createdCount > 0) parts.push(`${createdCount} student${createdCount !== 1 ? 's' : ''} added`);
+          if (updatedCount > 0) parts.push(`${updatedCount} student${updatedCount !== 1 ? 's' : ''} updated`);
+          if (parts.length > 0) showSuccessAlert("Success", parts.join(', ') + '.');
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          // Note: Removed automatic refresh after bulk upload to avoid GET after POST
+        } else {
+          updateState({ uploadedCount: 0, updatedCount: 0, isLoading: false });
+          showErrorAlert("Error", res.message || "Bulk upload failed");
+        }
+      } catch (err) {
+        updateState({ uploadedCount: 0, updatedCount: 0, isLoading: false });
+        showErrorAlert("Error", "Error processing file");
+      }
+    };
+
+    if (extension === "csv") {
+      reader.readAsText(file);
+    } else if (extension === "xls" || extension === "xlsx") {
+      reader.readAsBinaryString(file);
+    }
+  };
+
+  // Handle manual student entry
+  const handleManualEntry = async () => {
+    const { usn, name, email, section, semester, batch, phone, mode_of_admission } = state.manualForm;
+
+    const newErrors: any = {};
+
+    // USN validation removed
+    if (!usn) newErrors.usn = "USN is required";
+    // Removed USN format validation
+
+    // Name validation
+    const nameRegex = /^[A-Za-z\s]+$/;
+    if (!name) newErrors.name = "Name is required"; else
+      if (!nameRegex.test(name)) newErrors.name = "Name should contain only letters and spaces";
+
+    // Email validation (optional)
+    const emailRegex =
+      /^[a-zA-Z0-9]+([._%+-]?[a-zA-Z0-9]+)*@([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\.)+[A-Za-z]{2,10}$/;
+    const consecutiveDotRegex = /\.{2,}/;
+    if (email && (!emailRegex.test(email) || consecutiveDotRegex.test(email)))
+      newErrors.email = "Invalid email format (e.g., user@example.com)";
+
+    // Section, semester, batch
+    if (!section) newErrors.section = "Section is required";
+    if (!semester) newErrors.semester = "Semester is required";
+    if (!batch) newErrors.batch = "Batch is required";
+
+    // Cycle validation for semesters 1 and 2 (engineering/medical only)
+    if (getInstitutionType() !== 'school') {
+      const semesterNumber = getSemesterNumber(semester);
+      if (semesterNumber <= 2 && !state.manualForm.cycle) {
+        newErrors.cycle = "Cycle is required for semesters 1 and 2";
+      } else if (semesterNumber > 2 && state.manualForm.cycle) {
+        newErrors.cycle = "Cycle can only be set for semesters 1 and 2";
+      }
+    }
+
+    // Phone validation (optional)
+    const phoneRegex = /^\d{10}$/;
+    if (phone && !phoneRegex.test(phone)) newErrors.phone = "Phone must be 10 digits";
+
+    // If any validation errors, update state and stop
+    if (Object.keys(newErrors).length > 0) {
+      updateState({ manualErrors: newErrors });
+      Swal.fire({
+        icon: "error",
+        title: "Validation Error",
+        text: "Please fix the validation errors in the form before submitting.",
+        confirmButtonColor: "#9147e0"
+      });
+      return;
+    }
+
+    // If all valid, call API
+    try {
+      const res = await manageStudents(
+        {
+          action: "create",
+          branch_id: state.branchId,
+          usn,
+          name,
+          email,
+          phone,
+          semester_id: getSemesterId(semester),
+          section_id: getSectionId(section, state.manualSections),
+          batch_id: getBatchId(batch),
+          cycle: state.manualForm.cycle || undefined,
+          mode_of_admission: mode_of_admission || "KCET"
+        },
+        "POST"
+      );
+
+      if (res.success) {
+        // Optimistically add new student locally so UI updates without a full refresh
+        const newStudent = {
+          usn: usn,
+          name: name,
+          email: email,
+          section: section,
+          semester: semester,
+          cycle: state.manualForm.cycle,
+          phone: phone,
+          mode_of_admission: mode_of_admission
+        };
+        updateState({
+          students: [newStudent, ...state.students],
+          manualForm: {
+            usn: "",
+            name: "",
+            email: "",
+            section: "",
+            semester: "",
+            batch: "",
+            cycle: "",
+            phone: "",
+            mode_of_admission: ""
+          },
+          manualErrors: {},
+          uploadErrors: [],
+          uploadedCount: 1, // Show success message
+          currentPage: 1 // Reset to first page to show the new student
+        });
+        showSuccessAlert("Success", "Student added successfully.");
+        updateState({ uploadedCount: 0, updatedCount: 0 });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: res.message || "Error adding student",
+          confirmButtonColor: "#9147e0"
+        });
+      }
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to add student",
+        confirmButtonColor: "#9147e0"
+      });
+    }
+  };
+
+  // Handle edit save
+  const handleEditSave = async () => {
+    // Validate cycle for semesters 1 and 2 (engineering/medical only)
+    if (getInstitutionType() !== 'school') {
+      const semesterNumber = getSemesterNumber(state.editForm.semester);
+      if (semesterNumber <= 2 && !state.editForm.cycle) {
+        Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Cycle is required for semesters 1 and 2",
+          confirmButtonColor: "#9147e0"
+        });
+        return;
+      }
+    }
+
+    try {
+      const res = await manageStudents({
+        action: "update",
+        branch_id: state.branchId,
+        student_id: state.selectedStudent!.usn,
+        new_usn: state.editForm.usn,
+        name: state.editForm.name,
+        email: state.editForm.email,
+        phone: state.editForm.phone || undefined,
+        semester_id: getSemesterId(state.editForm.semester),
+        section_id: getSectionId(state.editForm.section, state.editSections),
+        cycle: state.editForm.cycle || undefined,
+        mode_of_admission: state.editForm.mode_of_admission || "KCET"
+      }, "POST");
+
+      if (res.success) {
+        // Optimistically update local list so changes appear immediately
+        const updated = state.students.map((s) =>
+          s.usn === state.selectedStudent!.usn ?
+            { ...s, usn: state.editForm.usn, name: state.editForm.name, email: state.editForm.email, phone: state.editForm.phone, section: state.editForm.section, semester: state.editForm.semester, cycle: state.editForm.cycle, mode_of_admission: state.editForm.mode_of_admission } :
+            s
+        );
+        updateState({ students: updated, editDialog: false, uploadErrors: [], editSections: [], currentPage: 1 });
+        showSuccessAlert("Success", "Student updated successfully.");
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: res.message || "Error updating student",
+          confirmButtonColor: "#9147e0"
+        });
+      }
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to update student",
+        confirmButtonColor: "#9147e0"
+      });
+    }
+  };
+
+  // Handle delete
+  const handleDelete = async () => {
+    try {
+      const res = await manageStudents({
+        action: "delete",
+        branch_id: state.branchId,
+        student_id: state.selectedStudent!.usn
+      }, "POST");
+
+      if (res.success) {
+        // Optimistically remove student from local state
+        const filtered = state.students.filter((s) => s.usn !== state.selectedStudent!.usn);
+        updateState({ students: filtered, confirmDelete: false, uploadErrors: [], currentPage: 1, selectedStudentUsns: state.selectedStudentUsns.filter(usn => usn !== state.selectedStudent!.usn) });
+        showSuccessAlert("Success", "Student deleted successfully.");
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: res.message || "Error deleting student",
+          confirmButtonColor: "#9147e0"
+        });
+      }
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete student",
+        confirmButtonColor: "#9147e0"
+      });
+    }
+  };
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    updateState({ isDeleting: true });
+    try {
+      const res = await manageStudents({
+        action: "bulk_delete",
+        branch_id: state.branchId,
+        student_ids: state.selectedStudentUsns
+      } as any, "POST");
+
+      if (res.success) {
+        const filtered = state.students.filter((s) => !state.selectedStudentUsns.includes(s.usn));
+        updateState({
+          students: filtered,
+          confirmBulkDelete: false,
+          isDeleting: false,
+          selectedStudentUsns: [],
+          uploadErrors: [],
+          currentPage: 1
+        });
+        showSuccessAlert("Success", res.message || "Selected students deleted successfully.");
+      } else {
+        updateState({ isDeleting: false });
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: res.message || "Error deleting students",
+          confirmButtonColor: "#9147e0"
+        });
+      }
+    } catch (err) {
+      updateState({ isDeleting: false });
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete students",
+        confirmButtonColor: "#9147e0"
+      });
+    }
+  };
+
+  // Generate CSV template
+  const generateTemplate = () => {
+    const semesterNumber = getSemesterNumber(state.manualForm.semester);
+    // Include phone as an additional column in the template
+    const headers = ["usn", "name", "email", "phone"];
+    const rows = [
+      ["1AM22CI001", "John Doe", "john.doe@example.com", "9876543210"],
+      ["1AM22CI002", "Jane Smith", "jane.smith@example.com", "9123456780"],
+      ["1AM22CI003", "Alice Johnson", "alice.johnson@example.com", "9988776655"]];
+
+    return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+  };
+
+  // Download CSV template
+  const downloadTemplate = async () => {
+    try {
+      const csvContent = generateTemplate();
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      await downloadFile(blob, "student_bulk_enroll_template.csv");
+    } catch (err) {
+      console.error("Failed to download template:", err);
+    }
+  };
+
+  // Handle file drop
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
+
+  // Close upload modal
+  const closeModal = () => {
+    updateState({
+      addStudentModal: false,
+      uploadErrors: [],
+      droppedFileName: null,
+      selectedFile: null,
+      uploadedCount: 0,
+      updatedCount: 0,
+      bulkForm: { batch: "", semester: "", section: "", mode_of_admission: "", cycle: "" }
+    });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  function levenshteinDistance(a: string, b: string): number {
+    const dp: number[][] = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+
+    for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+    for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1]; else
+          dp[i][j] = Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]) + 1;
+      }
+    }
+    return dp[a.length][b.length];
+  }
+
+  // Filter students for table (now server-side, so just use state.students)
+  const filteredStudents = state.students;
+
+  // Paginate the filtered students (server-side, so no slicing)
+  const paginatedFilteredStudents = filteredStudents;
+
+  const totalFilteredPages = Math.ceil(state.totalStudents / state.pageSize);
+
+  // Handle page change
+  const handlePageChange = async (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalFilteredPages) {
+      updateState({ currentPage: newPage });
+    }
+  };
+
+  // Open edit dialog
+  const openEdit = (student: Student) => {
+    let formattedSemester = student.semester;
+    
+    // Always extract the digit to match the `${s.number}th Semester` format required by Select
+    if (formattedSemester && formattedSemester !== 'Unknown') {
+      const match = String(formattedSemester).match(/\d+/);
+      if (match) {
+        formattedSemester = `${match[0]}th Semester`;
+      }
+    }
+
+    updateState({
+      selectedStudent: student,
+      editForm: {
+        usn: student.usn,
+        name: student.name,
+        email: student.email,
+        section: student.section,
+        semester: formattedSemester,
+        cycle: student.cycle || "",
+        phone: student.phone || "",
+        mode_of_admission: student.mode_of_admission || "KCET"
+      },
+      editDialog: true,
+      editSections: []
+    });
+    // Sections will be populated by useEffect based on semester
+  };
+
+  // Chart removed
+
+  return (
+    <div id="hod-students-container" className={`space-y-6 md:space-y-5 ${theme === 'dark' ? 'bg-background text-foreground' : 'bg-gray-50 text-gray-900'}`}>
+
+      {/* Add Student Manually Form */}
+      <Card id="add-student-manually-card" className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-200'}>
+        <CardHeader className="border-b pb-2">
+          <CardTitle className={`text-xl sm:text-2xl font-semibold leading-none tracking-tight ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Add Student Manually</CardTitle>
+          <CardDescription className="text-sm text-muted-foreground mt-1">Enroll a new student into the department manually.</CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-visible custom-scrollbar pt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-3">
+            {/* USN */}
+            <div className="flex flex-col">
+              <Input
+                placeholder="USN"
+                value={state.manualForm.usn}
+                maxLength={10}
+                onChange={(e) => {
+                  const value = e.target.value.toUpperCase();
+                  let error = "";
+
+                  updateState({
+                    manualForm: { ...state.manualForm, usn: value },
+                    manualErrors: { ...state.manualErrors, usn: error }
+                  });
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value.toUpperCase();
+                  let error = "";
+
+                  updateState({
+                    manualErrors: { ...state.manualErrors, usn: error }
+                  });
+                }}
+                className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border placeholder:text-muted-foreground' : 'bg-white text-gray-900 border-gray-300 placeholder:text-gray-500'} focus:ring-0 ${state.manualErrors?.usn ?
+                  "border-red-500" :
+                  theme === 'dark' ? 'border-border focus:border-primary' : 'border-gray-300 focus:border-blue-500'}`
+                } />
+
+              <span className="text-red-500 text-xs mt-1">
+                {state.manualErrors?.usn}
+              </span>
+            </div>
+
+            {/* Name Field */}
+            <div className="flex flex-col">
+              <Input
+                placeholder="Name"
+                value={state.manualForm.name}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^A-Za-z\s]/g, "");
+                  let error = "";
+
+                  // Live validation: only letters and spaces allowed
+                  if (value && !/^[A-Za-z\s]*$/.test(value)) {
+                    error = "Name should contain only letters and spaces";
+                  }
+
+                  updateState({
+                    manualForm: { ...state.manualForm, name: value },
+                    manualErrors: { ...state.manualErrors, name: error }
+                  });
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value.trim();
+                  const nameRegex = /^[A-Za-z\s]+$/;
+                  let error = "";
+                  if (!value) error = "Name is required"; else
+                    if (!nameRegex.test(value)) error = "Name should contain only letters and spaces";
+
+                  updateState({
+                    manualErrors: { ...state.manualErrors, name: error }
+                  });
+                }}
+                className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border placeholder:text-muted-foreground' : 'bg-white text-gray-900 border-gray-300 placeholder:text-gray-500'} focus:ring-0 ${state.manualErrors?.name ?
+                  "border-red-500" :
+                  theme === 'dark' ? 'border-border focus:border-primary' : 'border-gray-300 focus:border-blue-500'}`
+                } />
+
+              <span className="text-red-500 text-xs mt-1">
+                {state.manualErrors?.name}
+              </span>
+            </div>
+
+
+            {/* Email */}
+            <div className="flex flex-col">
+              <Input
+                placeholder="Email"
+                type="text"
+                value={state.manualForm.email}
+                onChange={(e) => {
+                  let value = e.target.value.toLowerCase();
+
+                  // Remove spaces and invalid characters commonly not allowed in email
+                  value = value.replace(/[!#$%^&*()_+<>?:"{}]/g, "");
+
+                  // Professional-grade email regex
+                  const emailRegex = /^[a-zA-Z0-9]+([._%+-]?[a-zA-Z0-9]+)*@([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\.)+[A-Za-z]{2,10}$/;
+                  const consecutiveDotRegex = /\.{2,}/;
+
+                  const error =
+                    value && (!emailRegex.test(value) || consecutiveDotRegex.test(value)) ?
+                      "Invalid email format (e.g., user@example.com)" :
+                      "";
+
+                  updateState({
+                    manualForm: { ...state.manualForm, email: value },
+                    manualErrors: { ...state.manualErrors, email: error }
+                  });
+                }}
+                className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border placeholder:text-muted-foreground' : 'bg-white text-gray-900 border-gray-300 placeholder:text-gray-500'} focus:ring-0 ${state.manualErrors?.email ?
+                  "border-red-500" :
+                  theme === 'dark' ? 'border-border focus:border-primary' : 'border-gray-300 focus:border-blue-500'}`
+                } />
+
+              <span className="text-red-500 text-xs mt-1">
+                {state.manualErrors?.email}
+              </span>
+            </div>
+
+            {/* Phone */}
+            <div className="flex flex-col">
+              <Input
+                placeholder="Phone"
+                type="tel"
+                value={state.manualForm.phone}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, "");
+                  let error = "";
+                  if (value && !/^\d{0,10}$/.test(value)) error = "Phone must be up to 10 digits";
+                  updateState({ manualForm: { ...state.manualForm, phone: value }, manualErrors: { ...state.manualErrors, phone: error } });
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value.trim();
+                  let error = "";
+                  if (value && !/^\d{10}$/.test(value)) error = "Phone must be 10 digits";
+                  updateState({ manualErrors: { ...state.manualErrors, phone: error } });
+                }}
+                className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border placeholder:text-muted-foreground' : 'bg-white text-gray-900 border-gray-300 placeholder:text-gray-500'} focus:ring-0 ${state.manualErrors?.phone ?
+                  "border-red-500" :
+                  theme === 'dark' ? 'border-border focus:border-primary' : 'border-gray-300 focus:border-blue-500'}`
+                } />
+
+              <span className="text-red-500 text-xs mt-1">{state.manualErrors?.phone}</span>
+            </div>
+
+            {/* Mode of Admission */}
+            <div className="flex flex-col">
+              <Select
+                value={state.manualForm.mode_of_admission}
+                onValueChange={(value) => updateState({ manualForm: { ...state.manualForm, mode_of_admission: value } })}>
+
+                <SelectTrigger id="mode-select-trigger" className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} focus:ring-0`}>
+                  <SelectValue placeholder="Choose Mode of Admission" />
+                </SelectTrigger>
+                <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                  {getInstitutionType() === 'school' ? (
+                    <>
+                      <SelectItem value="Regular">Regular</SelectItem>
+                      <SelectItem value="Management">Management</SelectItem>
+                      <SelectItem value="Merit">Merit</SelectItem>
+                      <SelectItem value="RTE">RTE</SelectItem>
+                      <SelectItem value="Transfer">Transfer</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="KCET">KCET</SelectItem>
+                      <SelectItem value="COMEDK">COMEDK</SelectItem>
+                      <SelectItem value="JEE Main">JEE Main</SelectItem>
+                      <SelectItem value="NEET">NEET</SelectItem>
+                      <SelectItem value="Merit">Merit</SelectItem>
+                      <SelectItem value="Management">Management</SelectItem>
+                      <SelectItem value="NRI">NRI</SelectItem>
+                      <SelectItem value="Lateral Entry">Lateral Entry</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Select
+              value={state.manualForm.semester}
+              onValueChange={(value) =>
+                updateState({
+                  manualForm: { ...state.manualForm, semester: value, section: "" },
+                  manualSections: []
+                })
+              }
+              disabled={state.isLoading}>
+
+              <SelectTrigger id="semester-select-trigger" className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} placeholder:text-muted-foreground focus:ring-0`}>
+                <SelectValue
+                  placeholder={state.semesters.length === 0 ? `No ${translateTerminology("semesters").toLowerCase()} available` : translateTerminology("Choose Semester")} />
+
+              </SelectTrigger>
+              <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                {state.semesters.map((s) =>
+                  <SelectItem key={s.id} value={`${s.number}th Semester`} className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                    {getSemesterName(s.number)}
+                  </SelectItem>
+                )}
+                {state.semesters.length === 0 && (
+                  <div className="p-2 flex justify-center" onPointerDown={(e) => e.stopPropagation()}>
+                    <Button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        forceCloseDropdowns();
+                        handleOpenAddSemester();
+                      }}
+                      className="w-full bg-primary hover:bg-[#9147e0] text-white shadow-sm transition-all active:scale-95 text-xs py-1.5 h-auto">
+                      + Add {translateTerminology("Semester")}
+                    </Button>
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+            <Select
+              value={state.manualForm.section}
+              onValueChange={(value) => updateState({ manualForm: { ...state.manualForm, section: value } })}
+              disabled={state.isLoading || !state.manualForm.semester}>
+
+              <SelectTrigger id="section-select-trigger" className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} placeholder:text-muted-foreground focus:ring-0`}>
+                <SelectValue
+                  placeholder={
+                    !state.manualForm.semester ?
+                      translateTerminology("Select semester first") :
+                      state.manualSections.length === 0 ?
+                        "No sections available" :
+                        "Choose Section"
+                  } />
+
+              </SelectTrigger>
+              <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                {state.manualSections.
+                  filter((section) => section.semester_id === getSemesterId(state.manualForm.semester)).
+                  map((section) =>
+                    <SelectItem key={section.id} value={section.name} className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                      Section {section.name}
+                    </SelectItem>
+                  )}
+                {state.manualForm.semester && state.manualSections.length === 0 && (
+                  <div className="p-2 flex justify-center" onPointerDown={(e) => e.stopPropagation()}>
+                    <Button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        forceCloseDropdowns();
+                        handleOpenAddSection();
+                      }}
+                      className="w-full bg-primary hover:bg-[#9147e0] text-white shadow-sm transition-all active:scale-95 text-xs py-1.5 h-auto">
+                      Add Section
+                    </Button>
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+            <Select
+              value={state.manualForm.batch}
+              onValueChange={(value) => updateState({ manualForm: { ...state.manualForm, batch: value } })}
+              disabled={state.isLoading || state.batches.length === 0}>
+
+              <SelectTrigger id="batch-select-trigger" className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} placeholder:text-muted-foreground focus:ring-0`}>
+                <SelectValue
+                  placeholder={state.batches.length === 0 ? "No batches available" : "Choose Batch"} />
+
+              </SelectTrigger>
+              <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                {state.batches.map((batch) =>
+                  <SelectItem key={batch.id} value={batch.name} className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                    {batch.name}
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {getInstitutionType() !== 'school' && state.manualForm.semester && getSemesterNumber(state.manualForm.semester) <= 2 &&
+              <Select
+                value={state.manualForm.cycle}
+                onValueChange={(value) => updateState({ manualForm: { ...state.manualForm, cycle: value } })}
+                disabled={state.isLoading}>
+
+                <SelectTrigger id="cycle-select-trigger" className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} placeholder:text-muted-foreground focus:ring-0`}>
+                  <SelectValue placeholder="Choose Cycle" />
+                </SelectTrigger>
+                <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                  <SelectItem value="P" className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                    P Cycle (Physics)
+                  </SelectItem>
+                  <SelectItem value="C" className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                    C Cycle (Chemistry)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            }
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button
+              onClick={handleManualEntry}
+              disabled={
+                state.isLoading ||
+                !state.branchId ||
+                !state.manualForm.semester ||
+                !state.manualForm.section ||
+                !state.manualForm.batch ||
+                (getInstitutionType() !== 'school' && getSemesterNumber(state.manualForm.semester) <= 2 && !state.manualForm.cycle)
+              }
+              className="flex items-center justify-center gap-1 text-sm font-medium px-4 py-1.5 rounded-md transition disabled:opacity-50 bg-primary text-white border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white">
+
+              + Add Student
+            </Button>
+          </div>
+          {state.uploadedCount === 1 &&
+            <p className={`text-sm mt-2 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+              Student added successfully.
+            </p>
+          }
+        </CardContent>
+      </Card>
+
+      <Card className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-200'}>
+        <div id="student-list-header-section">
+          <CardHeader className="border-b pb-2">
+            <div className="flex flex-row items-center justify-between gap-3 md:gap-4 w-full">
+              <div>
+                <CardTitle className={`text-xl sm:text-2xl font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Student List</CardTitle>
+                <CardDescription className="text-sm text-muted-foreground mt-1">View, search, and manage enrolled students in your department.</CardDescription>
+              </div>
+              <div className="flex w-auto gap-2">
+                {state.selectedStudentUsns.length > 0 && (
+                  <Button
+                    onClick={() => updateState({ confirmBulkDelete: true })}
+                    className="flex items-center justify-center gap-1 text-xs md:text-sm font-semibold px-3 py-1.5 rounded-md transition bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700 whitespace-nowrap h-10 w-auto"
+                    disabled={state.isLoading}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Selected ({state.selectedStudentUsns.length})
+                  </Button>
+                )}
+                {/* Bulk Upload Button */}
+                <Button
+                  onClick={() => updateState({ addStudentModal: true })}
+                  className="flex items-center justify-center gap-1 text-xs md:text-sm font-semibold px-3 py-1.5 rounded-md transition bg-primary text-white border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white whitespace-nowrap h-10 w-auto"
+                  disabled={state.isLoading || !state.branchId}
+                >
+                  <Upload className="w-4 h-4" />
+                  Bulk Upload
+                </Button>
+                {/* Desktop Download PDF Button */}
+                <Button
+                  onClick={handleExportPDF}
+                  className="hidden sm:flex flex-1 sm:flex-initial items-center justify-center gap-1 text-xs md:text-sm font-semibold px-3 py-1.5 rounded-md transition bg-primary text-white border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white whitespace-nowrap disabled:opacity-50 h-10"
+                  disabled={state.isLoading || !state.branchId || state.semesterFilter === "" || state.sectionFilter === "" || downloadingPDF}
+                >
+                  {downloadingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                  <span>{downloadingPDF ? "Exporting..." : "Export PDF"}</span>
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="pb-4 pt-3">
+            <div className="flex flex-col gap-3">
+              {/* Search bar — full width on all screens */}
+              <div className="search-wrapper flex gap-2 w-full">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-40" />
+                  <Input
+                    placeholder="Search students..."
+                    className={`w-full pl-10 pr-12 ${theme === 'dark' ? 'bg-card text-foreground border-border placeholder:text-muted-foreground' : 'bg-white text-gray-900 border-gray-300 placeholder:text-gray-500'}`}
+                    value={state.search}
+                    onChange={(e) => updateState({ search: e.target.value })}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()} />
+                  {state.search && (
+                    <button
+                      onClick={() => updateState({ search: "" })}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {/* Mobile Download PDF Icon Button */}
+                <Button
+                  onClick={handleExportPDF}
+                  disabled={state.isLoading || !state.branchId || state.semesterFilter === "" || state.sectionFilter === "" || downloadingPDF}
+                  size="icon"
+                  variant="outline"
+                  className="flex sm:hidden h-10 w-10 items-center justify-center shrink-0 border border-input bg-background text-foreground"
+                >
+                  {downloadingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                </Button>
+              </div>
+
+              {/* Semester + Section selects — stack on mobile, row on md+ */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Select
+                  value={state.semesterFilter}
+                  onValueChange={(value) =>
+                    updateState({
+                      semesterFilter: value,
+                      sectionFilter: "",
+                      cycleFilter: "",
+                      currentPage: 1,
+                      listSections: []
+                    })
+                  }
+                  disabled={state.isLoading || state.semesters.length === 0}>
+
+                  <SelectTrigger id="list-semester-select-trigger" className={`w-full sm:w-40 ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                    <SelectValue
+                      placeholder={
+                        state.semesters.length === 0 ?
+                          `No ${translateTerminology("semesters").toLowerCase()} available` :
+                          translateTerminology("Choose Semester")
+                      } />
+
+                  </SelectTrigger>
+                  <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                    {state.semesters.map((s) =>
+                      <SelectItem key={s.id} value={s.id} className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                        {getSemesterName(s.number)}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={state.sectionFilter}
+                  onValueChange={(value) =>
+                    updateState({ sectionFilter: value, currentPage: 1 })
+                  }
+                  disabled={
+                    state.isLoading ||
+                    state.semesterFilter === ""
+                  }>
+
+                  <SelectTrigger
+                    id="list-section-select-trigger"
+                    className={`w-full sm:w-40 ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}
+                    disabled={
+                      state.isLoading ||
+                      state.semesterFilter === ""
+                    }
+                  >
+                    <SelectValue
+                      placeholder={
+                        state.semesterFilter === "" ?
+                          translateTerminology("Select semester first") :
+                          state.listSections.filter((section) => section.semester_id === state.semesterFilter).length === 0 ?
+                            "No section available" :
+                            "Choose Section"
+                      } />
+
+                  </SelectTrigger>
+                  <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                    {state.listSections.filter((section) => section.semester_id === state.semesterFilter).length === 0 ? (
+                      <div className="p-2 text-center text-xs md:text-sm text-gray-500 dark:text-gray-400 font-medium">
+                        No section available
+                      </div>
+                    ) : (
+                      state.listSections.
+                        filter((section) => section.semester_id === state.semesterFilter).
+                        map((section) =>
+                          <SelectItem key={section.id} value={section.id} className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                            Section {section.name}
+                          </SelectItem>
+                        )
+                    )}
+                  </SelectContent>
+                </Select>
+
+                {/* Cycle dropdown — only for Semesters 1 and 2 (and not school) */}
+                {getInstitutionType() !== 'school' &&
+                  state.semesterFilter !== "" &&
+                  state.semesters.find(s => s.id === state.semesterFilter)?.number <= 2 && (
+                  <Select
+                    value={state.cycleFilter || "all"}
+                    onValueChange={(value) =>
+                      updateState({ cycleFilter: value === "all" ? "" : value, currentPage: 1 })
+                    }
+                    disabled={state.isLoading}>
+                    <SelectTrigger
+                      id="list-cycle-select-trigger"
+                      className={`w-full sm:w-40 ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}
+                    >
+                      <SelectValue placeholder="All Cycles" />
+                    </SelectTrigger>
+                    <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border' : 'bg-white text-gray-900 border border-gray-300'}>
+                      <SelectItem value="all" className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>All Cycles</SelectItem>
+                      <SelectItem value="P" className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>P Cycle</SelectItem>
+                      <SelectItem value="C" className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>C Cycle</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </div>
+
+        <CardContent className="pt-0">
+          {!state.search && (state.semesterFilter === "" || state.sectionFilter === "") ? (
+            <div className={`flex flex-col items-center justify-center py-20 px-4 rounded-lg border-2 border-dashed ${theme === 'dark' ? 'border-border bg-card/30' : 'border-gray-200 bg-gray-50/50'}`}>
+              <div className={`p-4 rounded-full mb-4 ${theme === 'dark' ? 'bg-primary/10' : 'bg-primary/5'}`}>
+                <Search className="w-10 h-10 text-primary opacity-50" />
+              </div>
+              <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+                {translateTerminology("Choose Semester")}, Choose Section
+              </h3>
+              <p className={`text-center max-w-sm ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+                Please choose a {translateTerminology("semester").toLowerCase()} and section from the dropdowns above to load the student list.
+              </p>
+            </div>
+          ) : state.isLoading ? (
+            <div className="py-4">
+              <SkeletonTable rows={10} cols={8} />
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm md:text-base text-left">
+                  <thead className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-gray-100 text-gray-900 border-gray-300'}>
+                    <tr className="border-b">
+                      <th className="py-3 px-3 md:px-4 text-sm md:text-base font-medium w-10">
+                        <Checkbox
+                          checked={paginatedFilteredStudents.length > 0 && paginatedFilteredStudents.every(s => state.selectedStudentUsns.includes(s.usn))}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              const newSelected = Array.from(new Set([...state.selectedStudentUsns, ...paginatedFilteredStudents.map(s => s.usn)]));
+                              updateState({ selectedStudentUsns: newSelected });
+                            } else {
+                              const newSelected = state.selectedStudentUsns.filter(usn => !paginatedFilteredStudents.some(s => s.usn === usn));
+                              updateState({ selectedStudentUsns: newSelected });
+                            }
+                          }}
+                        />
+                      </th>
+                      <th className="py-3 px-3 md:px-4 text-sm md:text-base font-medium">{translateTerminology("USN")}</th>
+                      <th className="py-3 px-3 md:px-4 text-sm md:text-base font-medium">Name</th>
+                      <th className="py-3 px-3 md:px-4 text-sm md:text-base font-medium">Email</th>
+                      <th className="hidden sm:table-cell py-3 px-3 md:px-4 text-sm md:text-base font-medium">Phone</th>
+                      <th className="hidden md:table-cell py-3 px-3 md:px-4 text-sm md:text-base font-medium">Section</th>
+                      {getInstitutionType() !== 'school' && (
+                        <th className="hidden lg:table-cell py-3 px-3 md:px-4 text-sm md:text-base font-medium">Mode</th>
+                      )}
+                      <th className="py-3 px-3 md:px-4 text-sm md:text-base font-medium">{translateTerminology("Semester")}</th>
+                      <th className="py-3 px-3 md:px-4 text-sm md:text-base font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className={theme === 'dark' ? 'divide-y divide-border' : 'divide-y divide-gray-200'}>
+                    {paginatedFilteredStudents.map((student) =>
+                      <tr key={student.usn} className={`${theme === 'dark' ? 'hover:bg-accent' : 'hover:bg-gray-50'} align-middle`}>
+                        <td className="py-3 px-3 md:px-4 text-sm md:text-base w-10">
+                          <Checkbox
+                            checked={state.selectedStudentUsns.includes(student.usn)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                updateState({ selectedStudentUsns: [...state.selectedStudentUsns, student.usn] });
+                              } else {
+                                updateState({ selectedStudentUsns: state.selectedStudentUsns.filter(usn => usn !== student.usn) });
+                              }
+                            }}
+                          />
+                        </td>
+                        <td className="py-3 px-3 md:px-4 text-sm md:text-base">{student.usn}</td>
+                        <td className="py-3 px-3 md:px-4 text-sm md:text-base whitespace-nowrap">{student.name}</td>
+                        <td className="py-3 px-3 md:px-4 text-sm md:text-base">{student.email}</td>
+                        <td className="hidden sm:table-cell py-3 px-3 md:px-4 text-sm md:text-base">{student.phone && student.phone.trim() ? student.phone : '-'}</td>
+                        <td className="hidden md:table-cell py-3 px-3 md:px-4 text-sm md:text-base">Section {student.section}</td>
+                        {getInstitutionType() !== 'school' && (
+                          <td className="hidden lg:table-cell py-3 px-3 md:px-4 text-sm md:text-base">{student.mode_of_admission || 'KCET'}</td>
+                        )}
+                        <td className="py-3 px-3 md:px-4 text-sm md:text-base">
+                          {(() => {
+                            const semNum = parseInt(student.semester.replace(/\D/g, ''), 10);
+                            return !isNaN(semNum) && semNum > 0 ? getSemesterName(semNum) : student.semester;
+                          })()}
+                        </td>
+                        <td className="py-3 px-3 md:px-4 text-sm md:text-base">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => openEdit(student)}
+                              className={theme === 'dark' ? 'text-primary hover:text-primary/80' : 'text-blue-600 hover:text-blue-800'}
+                              aria-label="Edit student"
+                            >
+                              <Pencil className="w-4 h-4 md:w-5 md:h-5" />
+                            </button>
+                            <button
+                              onClick={() =>
+                                updateState({ selectedStudent: student, confirmDelete: true })
+                              }
+                              className={theme === 'dark' ? 'text-destructive hover:text-destructive/80' : 'text-red-600 hover:text-red-800'}
+                              aria-label="Delete student">
+                              <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                {paginatedFilteredStudents.length === 0 &&
+                  <p className={`text-center mt-4 ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>No students found</p>
+                }
+              </div>
+            </>
+          )}
+        </CardContent>
+        {state.semesterFilter !== "" && state.sectionFilter !== "" && state.students.length > 1 && (
+          <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground px-6 py-4 border-t border-border mt-auto">
+            <div>
+              Showing {state.totalStudents === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1} to {Math.min(state.currentPage * state.pageSize, state.totalStudents)} of {state.totalStudents} students
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(state.currentPage - 1)}
+                disabled={state.currentPage === 1}
+                className="bg-primary hover:bg-primary/90 text-white border-primary h-9 px-4 transition-all">
+                Previous
+              </Button>
+
+              <div className="flex items-center justify-center min-w-[2rem]">
+                <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+                  {state.currentPage}
+                </span>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(state.currentPage + 1)}
+                disabled={state.currentPage === totalFilteredPages}
+                className="bg-primary hover:bg-primary/90 text-white border-primary h-9 px-4 transition-all">
+                Next
+              </Button>
+            </div>
+          </CardFooter>
+        )}
+      </Card>
+
+      {/* Student Performance Comparison chart removed to reduce calls and simplify page */}
+
+
+      <Dialog open={state.addStudentModal} onOpenChange={closeModal}>
+        <DialogContent
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          className={`${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} w-[92%] sm:w-auto md:w-[80%] lg:w-auto max-w-md sm:max-w-2xl md:max-w-3xl lg:max-w-2xl rounded-2xl sm:rounded-md p-4 max-h-[90vh] overflow-y-auto custom-scrollbar`}>
+          <DialogHeader>
+            <DialogTitle className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>Upload Student Data</DialogTitle>
+          </DialogHeader>
+
+          {/* Semester & Section Select */}
+          <div className="mb-4">
+            <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+              {getInstitutionType() === 'school' ? "Select Batch, Class, and Section" : "Select Batch, Semester, and Section"}
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Batch Dropdown */}
+              <Select
+                value={state.bulkForm.batch}
+                onValueChange={(value) =>
+                  updateState({
+                    bulkForm: {
+                      ...state.bulkForm,
+                      batch: value,
+                      semester: "",
+                      section: ""
+                    },
+                    manualSections: []
+                  })
+                }
+                disabled={state.isLoading || state.batches.length === 0}>
+
+                <SelectTrigger id="bulk-batch-select-trigger" className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                  <SelectValue
+                    placeholder={
+                      state.batches.length === 0 ?
+                        "No batches available" :
+                        "Choose Batch"
+                    } />
+
+                </SelectTrigger>
+                <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                  {state.batches.map((batch) =>
+                    <SelectItem
+                      key={batch.id}
+                      value={batch.name}
+                      className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+
+                      Batch {batch.name}
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+
+              {/* Semester Dropdown */}
+              <Select
+                value={state.bulkForm.semester}
+                onValueChange={(value) =>
+                  updateState({
+                    bulkForm: { ...state.bulkForm, semester: value, section: "" },
+                    manualSections: []
+                  })
+                }
+                disabled={
+                  state.isLoading ||
+                  !state.bulkForm.batch || // Disable if no batch selected
+                  state.semesters.length === 0
+                }>
+
+                <SelectTrigger id="bulk-semester-select-trigger" className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                  <SelectValue
+                    placeholder={
+                      state.semesters.length === 0 ?
+                        `No ${translateTerminology("semesters").toLowerCase()} available` :
+                        translateTerminology("Choose Semester")
+                    } />
+
+                </SelectTrigger>
+                <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                  {state.semesters.map((s) =>
+                    <SelectItem
+                      key={s.id}
+                      value={`${s.number}th Semester`}
+                      className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+
+                      {getSemesterName(s.number)}
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+
+              {/* Section Dropdown */}
+              <Select
+                value={state.bulkForm.section}
+                onValueChange={(value) =>
+                  updateState({ bulkForm: { ...state.bulkForm, section: value } })
+                }
+                disabled={
+                  state.isLoading ||
+                  !state.bulkForm.semester ||
+                  state.manualSections.length === 0
+                }>
+
+                <SelectTrigger id="bulk-section-select-trigger" className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                  <SelectValue
+                    placeholder={
+                      state.manualSections.length === 0 || !state.bulkForm.semester ?
+                        translateTerminology("Select semester first") :
+                        "Choose Section"
+                    } />
+
+                </SelectTrigger>
+                <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                  {state.manualSections.
+                    filter(
+                      (section) =>
+                        section.semester_id ===
+                        getSemesterId(state.bulkForm.semester)
+                    ).
+                    map((section) =>
+                      <SelectItem
+                        key={section.id}
+                        value={section.name}
+                        className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+
+                        Section {section.name}
+                      </SelectItem>
+                    )}
+                </SelectContent>
+              </Select>
+
+              {/* Mode of Admission Dropdown */}
+              <Select
+                value={state.bulkForm.mode_of_admission}
+                onValueChange={(value) => updateState({ bulkForm: { ...state.bulkForm, mode_of_admission: value } })}
+                disabled={state.isLoading}>
+
+                <SelectTrigger id="bulk-mode-select-trigger" className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                  <SelectValue placeholder="Mode of Admission" />
+                </SelectTrigger>
+                <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                  {getInstitutionType() === 'school' ? (
+                    <>
+                      <SelectItem value="Regular">Regular</SelectItem>
+                      <SelectItem value="Management">Management</SelectItem>
+                      <SelectItem value="Merit">Merit</SelectItem>
+                      <SelectItem value="RTE">RTE</SelectItem>
+                      <SelectItem value="Transfer">Transfer</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="KCET">KCET</SelectItem>
+                      <SelectItem value="COMEDK">COMEDK</SelectItem>
+                      <SelectItem value="JEE Main">JEE Main</SelectItem>
+                      <SelectItem value="NEET">NEET</SelectItem>
+                      <SelectItem value="Merit">Merit</SelectItem>
+                      <SelectItem value="Management">Management</SelectItem>
+                      <SelectItem value="NRI">NRI</SelectItem>
+                      <SelectItem value="Lateral Entry">Lateral Entry</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+
+              {/* Cycle Dropdown - only for semesters 1 and 2 (and not school) */}
+              {getInstitutionType() !== 'school' && state.bulkForm.semester && getSemesterNumber(state.bulkForm.semester) <= 2 &&
+                <Select
+                  value={state.bulkForm.cycle}
+                  onValueChange={(value) => updateState({ bulkForm: { ...state.bulkForm, cycle: value } })}
+                  disabled={state.isLoading}>
+
+                  <SelectTrigger id="bulk-cycle-select-trigger" className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                    <SelectValue placeholder="Select Cycle" />
+                  </SelectTrigger>
+                  <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                    <SelectItem value="P" className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                      P Cycle (Physics)
+                    </SelectItem>
+                    <SelectItem value="C" className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                      C Cycle (Chemistry)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              }
+            </div>
+          </div>
+
+
+          {/* File Upload Drop Zone & Button */}
+          <div
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center cursor-pointer transition-colors ${theme === 'dark' ? 'border-border hover:bg-accent' : 'border-gray-300 hover:bg-gray-100'}`}>
+
+            <UploadCloud size={36} className={`mx-auto mb-3 ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-400'}`} />
+            <p className={`font-medium mb-1 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+              Drag & drop file here
+            </p>
+            <p className={`text-xs mb-3 ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+              or
+            </p>
+
+            <input
+              type="file"
+              accept=".csv,.xls,.xlsx"
+              ref={fileInputRef}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  handleFileSelect(file);
+                }
+              }}
+              style={{ display: "none" }} />
+
+            <Button
+              type="button"
+              className="bg-primary text-white border-primary hover:bg-[#9147e0] hover:border-[#9147e0] px-4 py-2 flex items-center gap-2 mx-auto mb-3">
+              <UploadCloud size={16} />
+              Upload File
+            </Button>
+
+            <p className={`text-xs ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+              Supports CSV, XLS, XLSX (max 5MB, 500 records)
+            </p>
+
+            {state.droppedFileName &&
+              <p className={`text-sm mt-3 ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+                Selected file: <strong className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>{state.droppedFileName}</strong>
+              </p>
+            }
+            {state.uploadErrors.length > 0 &&
+              <ul className="text-sm text-red-400 mt-2 list-disc list-inside">
+                {state.uploadErrors.map((err, idx) =>
+                  <li key={idx}>{err}</li>
+                )}
+              </ul>
+            }
+            {(state.uploadedCount > 0 || state.updatedCount > 0) &&
+              <p className={`text-sm mt-2 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+                {state.uploadedCount > 0 && `${state.uploadedCount} new student${state.uploadedCount !== 1 ? 's' : ''} added`}
+                {state.uploadedCount > 0 && state.updatedCount > 0 && ', '}
+                {state.updatedCount > 0 && `${state.updatedCount} student${state.updatedCount !== 1 ? 's' : ''} updated`}
+                .
+              </p>
+            }
+          </div>
+
+          {/* Upload Instructions */}
+          <div className={`mt-6 text-sm ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+            <h4 className={`font-medium mb-2 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Upload Instructions</h4>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>Use the provided template for proper data formatting</li>
+              <li>
+                Required columns: <strong className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>{getInstitutionType() === 'school' ? "Roll No (or usn)" : "usn"}</strong> and <strong className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>name</strong>
+              </li>
+              <li>
+                Optional columns: <strong className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>email</strong> and <strong className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>phone</strong>
+              </li>
+              <li>
+                {getInstitutionType() === 'school' 
+                  ? "Class, Section, and Mode of Admission are selected above, not in the file"
+                  : "Semester, Section, Mode of Admission, and Cycle (for semesters 1-2) are selected above, not in the file"}
+              </li>
+              <li>Maximum 500 records per file</li>
+              <li>
+                <a
+                  href="#"
+                  className={theme === 'dark' ? 'text-primary underline' : 'text-blue-600 underline'}
+                  onClick={downloadTemplate}>
+
+                  Download Template
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Footer */}
+          <DialogFooter className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={closeModal}
+              className={`text-foreground ${theme === 'dark' ? 'bg-card border-border hover:bg-accent' : 'bg-white border-gray-300 hover:bg-gray-100'}`}>
+
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEnrollStudents}
+              disabled={!state.selectedFile || state.isLoading}
+              className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-md transition disabled:opacity-50 bg-primary text-white border-primary hover:bg-[#9147e0] hover:border-[#9147e0] hover:text-white">
+
+              {state.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enroll Students"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+      <Dialog open={state.confirmDelete} onOpenChange={() => updateState({ confirmDelete: false })}>
+        <DialogContent className={`${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} w-[92%] sm:w-auto max-w-sm mx-auto rounded-2xl sm:rounded-md p-4`}>
+          <DialogHeader>
+            <DialogTitle className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>Delete Student</DialogTitle>
+          </DialogHeader>
+          <div className={theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}>
+            Are you sure you want to delete <strong className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>{state.selectedStudent?.name}</strong>?
+          </div>
+          <DialogFooter className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => updateState({ confirmDelete: false })}
+              className={`text-foreground ${theme === 'dark' ? 'bg-card border-border hover:bg-accent' : 'bg-white border-gray-300 hover:bg-gray-100'}`}>
+
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} className="flex-shrink-0 bg-[#ef4444] hover:bg-[#dc2626] text-white border-transparent">
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={state.confirmBulkDelete} onOpenChange={() => !state.isDeleting && updateState({ confirmBulkDelete: false })}>
+        <DialogContent
+          onPointerDownOutside={(e) => state.isDeleting && e.preventDefault()}
+          onEscapeKeyDown={(e) => state.isDeleting && e.preventDefault()}
+          className={`${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} w-[92%] sm:w-auto max-w-sm mx-auto rounded-2xl sm:rounded-md p-4`}>
+          <DialogHeader>
+            <DialogTitle className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>Delete Selected Students</DialogTitle>
+          </DialogHeader>
+          <div className={theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}>
+            Are you sure you want to delete <strong className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>{state.selectedStudentUsns.length}</strong> selected students? This action cannot be undone.
+          </div>
+          <DialogFooter className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              disabled={state.isDeleting}
+              onClick={() => updateState({ confirmBulkDelete: false })}
+              className={`text-foreground ${theme === 'dark' ? 'bg-card border-border hover:bg-accent' : 'bg-white border-gray-300 hover:bg-gray-100'}`}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={state.isDeleting}
+              onClick={handleBulkDelete}
+              className="flex-shrink-0 bg-[#ef4444] hover:bg-[#dc2626] text-white border-transparent flex items-center justify-center gap-1.5"
+            >
+              {state.isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {state.isDeleting ? "Deleting..." : "Delete All"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={state.editDialog} onOpenChange={() => updateState({ editDialog: false, editSections: [] })}>
+        <DialogContent
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          className={`${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} w-[90%] sm:w-auto max-w-md sm:max-w-3xl rounded-2xl sm:rounded-md`}>
+          <DialogHeader>
+            <DialogTitle className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>Edit Student</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+            <div className="col-span-2 space-y-1">
+              <label className="text-[15px] font-medium ml-1">USN</label>
+              <Input
+                className={`h-9 ${theme === 'dark' ? 'bg-card text-foreground border-border placeholder:text-muted-foreground' : 'bg-white text-gray-900 border-gray-300 placeholder:text-gray-500'}`}
+                placeholder="USN"
+                value={state.editForm.usn}
+                onChange={(e) => updateState({ editForm: { ...state.editForm, usn: e.target.value.toUpperCase() } })} />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[15px] font-medium ml-1">Full Name</label>
+              <Input
+                className={`h-9 ${theme === 'dark' ? 'bg-card text-foreground border-border placeholder:text-muted-foreground' : 'bg-white text-gray-900 border-gray-300 placeholder:text-gray-500'}`}
+                placeholder="Name"
+                value={state.editForm.name}
+                onChange={(e) => updateState({ editForm: { ...state.editForm, name: e.target.value } })} />
+
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[15px] font-medium ml-1">Email Address</label>
+              <Input
+                className={`h-9 ${theme === 'dark' ? 'bg-card text-foreground border-border placeholder:text-muted-foreground' : 'bg-white text-gray-900 border-gray-300 placeholder:text-gray-500'}`}
+                placeholder="Email"
+                value={state.editForm.email}
+                onChange={(e) => updateState({ editForm: { ...state.editForm, email: e.target.value.toLowerCase() } })} />
+
+            </div>
+            <div className="col-span-1 space-y-1">
+              <label className="text-[15px] font-medium ml-1">Phone</label>
+              <Input
+                className={`h-9 ${theme === 'dark' ? 'bg-card text-foreground border-border placeholder:text-muted-foreground' : 'bg-white text-gray-900 border-gray-300 placeholder:text-gray-500'}`}
+                placeholder="Phone"
+                value={state.editForm.phone}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, "");
+                  updateState({ editForm: { ...state.editForm, phone: value } });
+                }} />
+
+            </div>
+            <div className="col-span-1 space-y-1">
+              <label className="text-[15px] font-medium ml-1">Admission</label>
+              <Select
+                value={state.editForm.mode_of_admission}
+                onValueChange={(value) => updateState({ editForm: { ...state.editForm, mode_of_admission: value } })}>
+
+                <SelectTrigger className={`h-9 ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                  <SelectValue placeholder="Mode" />
+                </SelectTrigger>
+                <SelectContent className={theme === 'dark' ? 'bg-card border-border' : 'bg-white border-gray-200'}>
+                  <SelectItem value="KCET">KCET</SelectItem>
+                  <SelectItem value="COMEDK">COMEDK</SelectItem>
+                  <SelectItem value="JEE Main">JEE Main</SelectItem>
+                  <SelectItem value="NEET">NEET</SelectItem>
+                  <SelectItem value="Merit">Merit</SelectItem>
+                  <SelectItem value="Management">Management</SelectItem>
+                  <SelectItem value="NRI">NRI</SelectItem>
+                  <SelectItem value="Lateral Entry">Lateral Entry</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-1 space-y-1">
+              <label className="text-[15px] font-medium ml-1">{translateTerminology("Semester")}</label>
+              <Select
+                value={state.editForm.semester}
+                onValueChange={(value) =>
+                  updateState({
+                    editForm: { ...state.editForm, semester: value, section: "" },
+                    editSections: []
+                  })
+                }
+                disabled={state.isLoading || state.semesters.length === 0}>
+
+                <SelectTrigger className={`h-9 ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                  <SelectValue
+                    placeholder={state.semesters.length === 0 ? "None" : "Sem"} />
+
+                </SelectTrigger>
+                <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}>
+                  {state.semesters.map((s) =>
+                    <SelectItem key={s.id} value={`${s.number}th Semester`} className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                      Semester {s.number}
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-1 space-y-1">
+              <label className="text-[15px] font-medium ml-1">Section</label>
+              <Select
+                value={state.editForm.section}
+                onValueChange={(value) => updateState({ editForm: { ...state.editForm, section: value } })}
+                disabled={
+                  state.isLoading || state.isEditSectionsLoading || !state.editForm.semester || state.editSections.length === 0
+                }>
+
+                <SelectTrigger className={`h-9 ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                  <SelectValue
+                    placeholder={
+                      state.editSections.length === 0 || !state.editForm.semester ?
+                        "N/A" :
+                        state.isEditSectionsLoading ?
+                          "..." :
+                          "Sec"
+                    } />
+
+                </SelectTrigger>
+                <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}>
+                  {state.editSections.
+                    filter((section) => section.semester_id === getSemesterId(state.editForm.semester)).
+                    map((section) =>
+                      <SelectItem key={section.id} value={section.name} className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                        Section {section.name}
+                      </SelectItem>
+                    )}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Cycle field - only show for semesters 1 and 2 (and not school) */}
+            {getInstitutionType() !== 'school' && getSemesterNumber(state.editForm.semester) <= 2 &&
+              <div className="col-span-2 space-y-1">
+                <label className="sm:text-[15px] font-medium ml-1">Cycle</label>
+                <Select
+                  value={state.editForm.cycle}
+                  onValueChange={(value) => updateState({ editForm: { ...state.editForm, cycle: value } })}>
+
+                  <SelectTrigger className={`h-9 ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                    <SelectValue placeholder="Select Cycle" />
+                  </SelectTrigger>
+                  <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}>
+                    <SelectItem value="P" className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>Physics Cycle</SelectItem>
+                    <SelectItem value="C" className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>Chemistry Cycle</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            }
+          </div>
+          <DialogFooter className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              className={`text-foreground ${theme === 'dark' ? 'bg-card border-border hover:bg-accent' : 'bg-white border-gray-300 hover:bg-gray-100'}`}
+              onClick={() => updateState({ editDialog: false, editSections: [] })}>
+
+              Cancel
+            </Button>
+            <Button onClick={handleEditSave} className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-md transition disabled:opacity-50 bg-primary text-white border-primary hover:bg-[#9147e0] hover:border-[#9147e0]">
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Semester Modal */}
+      <Dialog open={isAddSemesterOpen} onOpenChange={setIsAddSemesterOpen}>
+        <DialogContent className={`${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} w-[90%] sm:max-w-lg rounded-md sm:rounded-lg`}>
+          <DialogHeader>
+            <h2 className={`text-lg font-semibold text-center ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+              Add Semester
+            </h2>
+          </DialogHeader>
+          <form onSubmit={handleAddSemester} className="space-y-4">
+            <div className="text-center">
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Semester Number</label>
+              <Input
+                type="number"
+                value={newSemesterNumber}
+                onChange={(e) => setNewSemesterNumber(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                  }
+                }}
+                placeholder="Enter semester number "
+                min="1"
+                max="20"
+                disabled={addingSemester}
+                className={`text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}
+              />
+            </div>
+            <DialogFooter className="mt-4 flex flex-col sm:flex-row sm:justify-end gap-2">
+              <Button
+                type="button"
+                onClick={() => setIsAddSemesterOpen(false)}
+                disabled={addingSemester}
+                className={`w-full sm:w-auto ${theme === 'dark' ? 'bg-card border-border hover:bg-accent text-foreground' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-200'}`}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addingSemester} className="w-full sm:w-auto bg-primary text-white border-primary hover:bg-primary/90 hover:border-primary/90">
+                {addingSemester ? <Loader2 className="w-4 h-4 mr-2 animate-spin inline-block" /> : null}
+                Add Semester
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Section Modal */}
+      <Dialog open={isAddSectionOpen} onOpenChange={setIsAddSectionOpen}>
+        <DialogContent
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          className={`${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} w-[90%] sm:max-w-lg rounded-md sm:rounded-lg`}>
+          <DialogHeader>
+            <h2 className={`text-lg font-semibold text-center ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+              Add Section for Semester {state.manualForm.semester ? state.manualForm.semester.replace(/[^0-9]/g, '') : ""}
+            </h2>
+          </DialogHeader>
+          <form onSubmit={handleAddSection} className="space-y-4">
+            <div className="text-center">
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Section Name</label>
+              <Select
+                value={newSectionName}
+                onValueChange={setNewSectionName}
+                disabled={addingSection}
+              >
+                <SelectTrigger className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                  <SelectValue placeholder="Select Section" />
+                </SelectTrigger>
+                <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                  {["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"].map((section) => (
+                    <SelectItem key={section} value={section} className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                      Section {section}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="mt-4 flex flex-col sm:flex-row sm:justify-end gap-2">
+              <Button
+                type="button"
+                onClick={() => setIsAddSectionOpen(false)}
+                disabled={addingSection}
+                className={`w-full sm:w-auto ${theme === 'dark' ? 'bg-card border-border hover:bg-accent text-foreground' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-200'}`}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addingSection} className="w-full sm:w-auto bg-primary text-white border-primary hover:bg-primary/90 hover:border-primary/90">
+                {addingSection ? <Loader2 className="w-4 h-4 mr-2 animate-spin inline-block" /> : null}
+                Add Section
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>);
+
+};
+
+export default StudentManagement;

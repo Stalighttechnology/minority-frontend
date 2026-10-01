@@ -1,0 +1,1056 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --safe-area-inset-top: 0px;
+    --safe-area-inset-bottom: 0px;
+    --safe-area-inset-left: 0px;
+    --safe-area-inset-right: 0px;
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 266 100% 67%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 266 100% 67%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* in your global CSS file, e.g., index.css */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 0px;
+  /* hide scrollbar */
+  background: transparent;
+  /* optional: make background transparent */
+}
+
+.thin-scrollbar {
+  -ms-overflow-style: none !important;
+  /* IE and Edge */
+  scrollbar-width: none !important;
+  /* Firefox */
+}
+
+/* ── Custom Branded Scrollbar — always visible on macOS & Windows ────────────
+   Defining ::-webkit-scrollbar forces WebKit (Chrome / Edge / Safari on macOS)
+   out of "overlay" mode into "classic" mode: scrollbars are always shown.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+
+
+/* ── Preserve hidden scrollbar for .thin-scrollbar elements ──────────────── */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+.thin-scrollbar {
+  scrollbar-width: none !important;
+}
+
+
+.bot-message * {
+  background-color: #1c1c1e !important;
+  color: #e5e7eb !important;
+  /* Tailwind's gray-200 */
+}
+
+.bot-message pre,
+.bot-message code {
+  background-color: #1c1c1e !important;
+  /* Tailwind's gray-800 */
+  color: #e5e7eb !important;
+}
+
+@layer base {
+
+  html,
+  body,
+  #root {
+    @apply bg-background text-foreground;
+    min-height: 100%;
+  }
+}
+
+/* Global Root Scaling for Mobile */
+@media (max-width: 480px) {
+  html {
+    font-size: 112.5%; /* Scales 16px -> 18px */
+  }
+
+  /* Global Weight Refinement - Replace Bold with Semi-bold */
+  .font-bold, 
+  .font-extrabold,
+  .font-black,
+  b, 
+  strong,
+  th,
+  h1, h2, h3, h4,
+  .font-bold *,
+  [style*="font-weight: 700"],
+  [style*="font-weight: 800"],
+  [style*="font-weight: 900"],
+  [style*="font-weight: bold"] {
+    font-weight: 600 !important;
+  }
+
+  /* Vertical & Horizontal Spacing Refinement */
+  .p-6 { padding: 1rem !important; }
+  .px-6 { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .py-6 { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+  .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem !important; }
+  .gap-6 { gap: 1rem !important; }
+  .mb-6 { margin-bottom: 1rem !important; }
+
+  /* Table Specific Refinements */
+  th, td {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+  
+  .overflow-x-auto {
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+
+/* Allow default browser scrolling on html by default, keeping body and root visible to prevent double scrollbars.
+   DashboardLayout, LoginMobile, and other viewport-constrained layouts handle 
+   their own inner scrolling and viewport locks via relative classes. */
+html {
+  overflow-y: auto !important;
+  height: 100% !important;
+}
+
+body {
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 100% !important;
+}
+
+#root {
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 100% !important;
+}
+
+html.dashboard-active,
+body.dashboard-active,
+body.dashboard-active #root {
+  overflow: hidden !important;
+  height: 100% !important;
+  height: 100dvh !important;
+}
+
+/* Global Custom Scrollbar Styling - Hidden but still scrollable */
+::-webkit-scrollbar {
+  width: 0px !important;
+  height: 0px !important;
+  background: transparent !important;
+  display: none !important;
+}
+
+/* Firefox support */
+html,
+body,
+#root {
+  scrollbar-width: none !important;
+}
+
+/* IE/Edge Legacy */
+html,
+body,
+#root {
+  -ms-overflow-style: none !important;
+}
+
+.react-datepicker-wrapper,
+.react-datepicker__input-container {
+  width: 100% !important;
+  display: block !important;
+}
+
+/* Calendar popup background */
+.react-datepicker {
+  background-color: hsl(var(--background)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+  /* gray-200 */
+  font-size: 0.875rem;
+  /* text-sm */
+}
+
+/* Header (month & navigation) */
+.react-datepicker__header {
+  background-color: hsl(var(--card)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+  /* gray-100 */
+}
+
+/* Month and year dropdowns */
+.react-datepicker__header select {
+  color: hsl(var(--foreground)) !important;
+  background-color: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+
+/* Navigation arrows */
+.react-datepicker__navigation {
+  border-color: hsl(var(--foreground)) !important;
+}
+
+/* Month and year header text */
+.react-datepicker__current-month {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Day names (Mon, Tue, etc.) */
+.react-datepicker__day-name {
+  color: hsl(var(--muted-foreground)) !important;
+  /* gray-400 */
+}
+
+/* Normal days */
+.react-datepicker__day {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Hover effect */
+.react-datepicker__day:hover {
+  background-color: hsl(var(--accent)) !important;
+  border-radius: 6px;
+}
+
+/* Selected day */
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: hsl(var(--primary)) !important;
+  /* indigo-600 */
+  color: hsl(var(--primary-foreground)) !important;
+  border-radius: 6px;
+}
+
+/* Disabled days */
+.react-datepicker__day--disabled {
+  color: hsl(var(--muted-foreground)) !important;
+  /* gray-500 */
+}
+
+/* Today highlight */
+.react-datepicker__day--today {
+  border: 1px solid hsl(var(--muted-foreground)) !important;
+  border-radius: 6px;
+}
+
+/* ── Always-visible scrollbar for Select dropdowns ────────────────────────── */
+/*
+  ROOT CAUSE FIX NOTES:
+  1. overflow-clip (not overflow-hidden) on SelectContent parent prevents
+     the parent from clipping the scrollbar gutter of the child Viewport.
+  2. -webkit-appearance: none on ::-webkit-scrollbar forces WebKit/Safari
+     (macOS) out of "overlay" mode into persistent "classic" mode.
+  Without BOTH, macOS still renders overlay-only scrollbars.
+*/
+.select-scrollbar,
+[data-radix-select-viewport] {
+  overflow-y: auto !important;
+  scrollbar-gutter: auto !important;
+  -ms-overflow-style: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #c4c8cf #f3f4f6 !important;
+}
+
+/* Webkit (Chrome, Edge, Safari on macOS) —
+   Defining ::-webkit-scrollbar with a non-zero width AND
+   -webkit-appearance: none together force WebKit out of "overlay" mode.
+   Without appearance: none, Safari on macOS may still render the
+   overlay-style scrollbar even with a custom width set. */
+.select-scrollbar::-webkit-scrollbar,
+[data-radix-select-viewport]::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+  display: block !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+.select-scrollbar::-webkit-scrollbar-track,
+[data-radix-select-viewport]::-webkit-scrollbar-track {
+  border-radius: 6px;
+  background: #f3f4f6;
+}
+
+.select-scrollbar::-webkit-scrollbar-thumb,
+[data-radix-select-viewport]::-webkit-scrollbar-thumb {
+  border-radius: 6px;
+  min-height: 24px;
+  background-color: #c4c8cf;
+}
+
+.select-scrollbar::-webkit-scrollbar-thumb:hover,
+[data-radix-select-viewport]::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+}
+
+/* Dark theme */
+.dark .select-scrollbar,
+.dark [data-radix-select-viewport] {
+  scrollbar-color: #555 #1e1e22 !important;
+}
+
+.dark .select-scrollbar::-webkit-scrollbar-track,
+.dark [data-radix-select-viewport]::-webkit-scrollbar-track {
+  background: #1e1e22;
+}
+
+.dark .select-scrollbar::-webkit-scrollbar-thumb,
+.dark [data-radix-select-viewport]::-webkit-scrollbar-thumb {
+  background-color: #555;
+}
+
+.dark .select-scrollbar::-webkit-scrollbar-thumb:hover,
+.dark [data-radix-select-viewport]::-webkit-scrollbar-thumb:hover {
+  background-color: #777;
+}
+
+/* Theme-aware Scrollbar */
+/* Default (light) colors always present — not wrapped in .light so they
+   work when the root element has no class prefix */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 5px;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  display: block !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  border-radius: 8px;
+  background: #f3f4f6;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background-color: #d1d5db;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+}
+
+/* Dark theme scrollbar */
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: #1c1c1e;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #555;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #777;
+}
+
+/* Firefox support — default (light) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db #f3f4f6;
+}
+
+.dark .custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #555 #1c1c1e;
+}
+
+/* Always-visible Table Horizontal Scrollbar */
+.visible-table-scrollbar {
+  overflow-x: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #a1a1aa #f4f4f5 !important;
+}
+
+.visible-table-scrollbar::-webkit-scrollbar {
+  height: 9px !important;
+  width: 9px !important;
+  display: block !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+.visible-table-scrollbar::-webkit-scrollbar-track {
+  border-radius: 9999px;
+  background: #f4f4f5 !important;
+}
+
+.visible-table-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: #a1a1aa !important;
+}
+
+.visible-table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #71717a !important;
+}
+
+.dark .visible-table-scrollbar {
+  scrollbar-color: #52525b #27272a !important;
+}
+
+.dark .visible-table-scrollbar::-webkit-scrollbar-track {
+  background: #27272a !important;
+}
+
+.dark .visible-table-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #52525b !important;
+}
+
+.dark .visible-table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #71717a !important;
+}
+
+/* SweetAlert2 Theme Styles */
+/* Light theme for SweetAlert2 */
+.light .swal2-popup {
+  background: #ffffff !important;
+  color: #374151 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.1) !important;
+}
+
+.light .swal2-title {
+  color: #1f2937 !important;
+  font-size: 1.25rem !important;
+}
+
+.light .swal2-html-container {
+  color: #4b5563 !important;
+}
+
+.light .swal2-confirm {
+  background-color: hsl(var(--primary)) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  border: none !important;
+}
+
+.light .swal2-cancel {
+  background-color: #f3f4f6 !important;
+  color: #4b5563 !important;
+  border-radius: 8px !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+/* Dark theme for SweetAlert2 */
+.dark .swal2-popup {
+  background: #1c1c1e !important;
+  color: #f0f0f0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .swal2-title {
+  color: #ffffff !important;
+  font-size: 1.25rem !important;
+}
+
+.dark .swal2-html-container {
+  color: #cccccc !important;
+}
+
+.dark .swal2-confirm {
+  background-color: hsl(var(--primary)) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  border: none !important;
+}
+
+.dark .swal2-cancel {
+  background-color: #374151 !important;
+  color: #e5e7eb !important;
+  border-radius: 8px !important;
+  border: 1px solid #4b5563 !important;
+}
+
+/* SweetAlert2 backdrop */
+.swal2-backdrop-show {
+  background: rgba(0, 0, 0, 0.4) !important;
+  opacity: 1 !important;
+}
+
+.swal2-backdrop-hide {
+  opacity: 0 !important;
+}
+
+/* General SweetAlert2 styles */
+.swal2-popup {
+  font-family: inherit !important;
+}
+
+.swal2-icon {
+  margin: 1rem auto !important;
+}
+
+.swal2-actions {
+  margin: 1.25rem auto 0 !important;
+}
+
+.swal2-styled.swal2-confirm:focus,
+.swal2-styled.swal2-cancel:focus {
+  box-shadow: none !important;
+}
+
+/* Prevent page shifting when SweetAlert is shown */
+.swal2-shown {
+  overflow: hidden !important;
+}
+
+/* Prevent body scrolling when modal is open */
+body.swal2-shown {
+  overflow: hidden !important;
+  padding-right: 0 !important;
+}
+
+/* Maintain consistent scrollbar width */
+html {
+  margin-left: calc(100vw - 100%);
+}
+
+/* Prevent layout shifts */
+.swal2-backdrop-show,
+.swal2-hide {
+  animation: swal2-backdrop-animation 0.1s forwards !important;
+}
+
+@keyframes swal2-backdrop-animation {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Ensure SweetAlert overlays above other UI modals (e.g., Radix Dialog z-50) */
+.swal2-container,
+.swal2-backdrop,
+.swal2-popup,
+.sweetalert-popup {
+  z-index: 2147483647 !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure modal is centered */
+.swal2-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Recharts Pie Chart Styling for Both Themes */
+.recharts-wrapper svg *:focus {
+  outline: none;
+}
+
+/* Light theme pie chart hover effect */
+.light .recharts-pie-sector:hover {
+  filter: brightness(0.9);
+}
+
+/* Dark theme pie chart hover effect */
+.dark .recharts-pie-sector:hover {
+  filter: brightness(1.2);
+}
+
+/* Light theme pie chart active sector */
+.light .recharts-pie-active-sector {
+  filter: brightness(0.85);
+}
+
+/* Dark theme pie chart active sector */
+.dark .recharts-pie-active-sector {
+  filter: brightness(1.3);
+}
+
+/* Improve pie chart visibility in both themes */
+.recharts-pie-sector {
+  stroke-width: 1px;
+  transition: filter 0.2s ease;
+}
+
+/* Light theme pie chart stroke */
+.light .recharts-pie-sector {
+  stroke: #ffffff !important;
+}
+
+/* Dark theme pie chart stroke */
+.dark .recharts-pie-sector {
+  stroke: #1c1c1e !important;
+}
+
+/* Override transparent stroke for better visibility */
+.dark .recharts-sector[stroke='#fff'],
+.light .recharts-sector[stroke='#fff'] {
+  stroke: transparent !important;
+}
+
+@keyframes blink {
+
+  0%,
+  50%,
+  100% {
+    opacity: 1;
+  }
+
+  25%,
+  75% {
+    opacity: 0;
+  }
+}
+
+.animate-blink {
+  animation: blink 1s infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+
+
+/* Mobile responsive styles for SubmitLeaveRequest component */
+@media (max-width: 480px) {
+  .mobile-period-cell {
+    min-width: 180px !important;
+  }
+}
+
+/* Mobile responsive styles for StudentTimetable component */
+@media (max-width: 480px) {
+  .mobile-card {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .mobile-card-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 12px !important;
+  }
+
+  .mobile-card-title {
+    font-size: 16px !important;
+  }
+
+  .mobile-card-content {
+    padding: 0 !important;
+  }
+
+  .mobile-timetable-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: hidden !important;
+    width: 100vw !important;
+    max-width: 100% !important;
+    position: relative !important;
+    left: 50% !important;
+    right: 50% !important;
+    margin-left: -50vw !important;
+    margin-right: -50vw !important;
+  }
+
+  .mobile-h2 {
+    font-size: 14px !important;
+    gap: 4px !important;
+  }
+
+  .mobile-h2 svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .mobile-table-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border: none !important;
+    padding: 0 8px !important;
+  }
+
+  .mobile-timetable {
+    min-width: 360px !important;
+    font-size: 11px !important; /* Increased from 10px */
+    width: auto !important;
+  }
+
+  .mobile-table-header {
+    padding: 4px 3px !important;
+    font-size: 11px !important; /* Increased from 9px */
+    font-weight: 600 !important;
+    line-height: 1.2 !important;
+  }
+
+  .mobile-table-cell {
+    padding: 3px 2px !important;
+    font-size: 11px !important; /* Increased from 8px */
+    min-width: 60px !important;
+    line-height: 1.1 !important;
+  }
+
+  .mobile-touch-target {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    width: 100% !important;
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+  }
+}
+
+@media (max-width: 760px) {
+
+  html,
+  body,
+  #root {
+    min-height: 100dvh;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    overflow-x: hidden;
+  }
+
+  body.tutorial-active,
+  body.tutorial-active #root,
+  html.tutorial-active {
+    background: #ffffff !important;
+  }
+
+  html.dark body.tutorial-active,
+  html.dark body.tutorial-active #root,
+  html.dark.tutorial-active,
+  .dark body.tutorial-active,
+  .dark body.tutorial-active #root,
+  .dark html.tutorial-active {
+    background: #030712 !important;
+  }
+
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Disable layout and sidebar transitions during active onboarding to prevent Joyride coordinate mismatches */
+body.tutorial-active .transition-all,
+body.tutorial-active .sidebar,
+body.tutorial-active aside {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Mobile onboarding bottom sheet styling overrides */
+@media (max-width: 768px) {
+  /* Force Joyride floater parent to stay fixed at bottom */
+  .react-joyride__floater,
+  .react-joyride__tooltip,
+  div[class*="react-joyride__floater"],
+  div[class*="react-joyride__tooltip"] {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 99999 !important;
+  }
+
+  /* Hide default Popper arrow on mobile */
+  .react-joyride__arrow,
+  [data-popper-arrow],
+  div[class*="react-joyride__arrow"] {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+  }
+
+  /* Ensure overlay layer behaves nicely with the bottom sheet */
+  .react-joyride__overlay {
+    z-index: 99998 !important;
+  }
+}
+
+/* Disable react-joyride beacons/dots completely globally */
+.react-joyride__beacon,
+.react-joyride__beacon *,
+[class*="react-joyride__beacon"],
+[class*="react-joyride__beacon"] * {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Modal Backdrop overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 999998;
+}
+
+/* Custom scrollbar utility */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide the underlying root web page when printing */
+  #root {
+    display: none !important;
+  }
+
+  /* Make Radix Portal flow naturally in print */
+  [data-radix-portal] {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide backdrop overlay, dialog close button, and modal action bar */
+  [data-radix-portal] > [class*="fixed"],
+  [data-radix-portal] button,
+  #report-modal-header,
+  .print\:hidden,
+  .print-hidden {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Reset Radix DialogContent to static full-page flow */
+  [role="dialog"] {
+    position: static !important;
+    transform: none !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* Wrapper for printable canvas */
+  #report-canvas-wrapper {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  #printable-college-report-card {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    display: block !important;
+  }
+
+  /* Table and section page-break controls */
+  #printable-college-report-card table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+
+  #printable-college-report-card tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #printable-college-report-card th,
+  #printable-college-report-card td {
+    border: 1px solid #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #printable-college-report-card .report-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}

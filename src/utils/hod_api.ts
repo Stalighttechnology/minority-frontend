@@ -1,0 +1,3265 @@
+import { API_ENDPOINT } from "./config";
+import { fetchWithTokenRefresh } from "./authService";
+
+// Type definitions for request and response data
+interface HODStatsResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    faculty_count: number;
+    student_count: number;
+    pending_leaves: number;
+    average_attendance: number;
+    attendance_trend: Array<{
+      week: string;
+      start_date: string;
+      end_date: string;
+      attendance_percentage: number;
+    }>;
+    unread_announcement_count?: number;
+  };
+}
+
+interface LowAttendanceResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    students: Array<{
+      student_id: string;
+      name: string;
+      usn: string;
+      attendance_percentage: number;
+      total_sessions: number;
+      present_sessions: number;
+      semester: number | null;
+      section: string | null;
+      batch: string;
+      subject: string;
+    }>;
+  };
+}
+
+interface Semester {
+  id: string;
+  number: number;
+}
+
+interface GetSemestersResponse {
+  success: boolean;
+  message?: string;
+  data?: Semester[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  total_pages?: number;
+  current_page?: number;
+}
+
+interface Section {
+  id: string;
+  name: string;
+  semester_id: string;
+}
+
+interface GetSectionsResponse {
+  success: boolean;
+  message?: string;
+  data?: Section[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  total_pages?: number;
+  current_page?: number;
+}
+
+interface Branch {
+  id: string;
+  name: string;
+}
+
+interface GetBranchesResponse {
+  success: boolean;
+  message?: string;
+  data?: Branch[];
+}
+
+interface GetAttendanceBootstrapResponse {
+  success: boolean;
+  message?: string;
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+  next?: string | null;
+  previous?: string | null;
+  data?: {
+    profile: {
+      username: string;
+      email: string;
+      first_name: string;
+      last_name: string;
+      mobile_number: string;
+      address: string;
+      bio: string;
+      branch: string;
+      branch_id: string;
+    };
+    branches: Branch[];
+    semesters: Array<{id: string;number: number;}>;
+    sections: Array<{id: string;name: string;semester_id: string;}>;
+    subjects: Array<{id: string;name: string;subject_code: string;semester_id: string;}>;
+    attendance: {
+      students: Array<{
+        student_id: string;
+        name: string;
+        usn: string;
+        attendance_percentage: number | string;
+        total_sessions: number;
+        present_sessions: number;
+        semester: number | null;
+        section: string | null;
+        batch: string | null;
+        subject: string;
+      }>;
+    };
+  };
+}
+
+interface Batch {
+  id: string;
+  name: string;
+  start_year: number;
+  end_year: number;
+  student_count: number;
+  created_at: string;
+}
+
+interface Course {
+  id: string;
+  name: string;
+}
+
+interface GetStudentOptionsResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    batches: Batch[];
+    courses: Course[];
+    semesters: Semester[];
+    sections: Section[];
+  };
+}
+
+interface Faculty {
+  id: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+}
+
+interface GetFacultiesResponse {
+  success: boolean;
+  message?: string;
+  data?: Faculty[];
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+}
+
+interface ManageSemestersRequest {
+  action: "create" | "update" | "delete";
+  semester_id?: string;
+  number?: number;
+  branch_id: string;
+}
+
+interface ManageSemestersResponse {
+  success: boolean;
+  message?: string;
+}
+
+interface ManageSectionsRequest {
+  action: "create" | "update" | "delete";
+  section_id?: string;
+  name?: string;
+  semester_id?: string;
+  branch_id: string;
+}
+
+interface ManageSectionsResponse {
+  success: boolean;
+  message?: string;
+  data?: {id: string;name: string;semester_id: string;};
+}
+
+interface ManageStudentsRequest {
+  action: "create" | "update" | "delete" | "bulk_delete" | "bulk_update" | "register_subjects" | "bulk_register_subjects" | "bulk_unregister_subjects";
+  student_id?: string;
+  usn?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  semester_id?: string;
+  section_id?: string;
+  branch_id: string;
+  batch_id?: string;
+  course_id?: string;
+  cycle?: string;
+  parent_name?: string;
+  parent_contact?: string;
+  emergency_contact?: string;
+  blood_group?: string;
+  mode_of_admission?: string;
+  date_of_admission?: string;
+  subject_ids?: string[];
+  subject_id?: string;
+  student_ids?: string[];
+  lab_batch_id?: string;
+  student_lab_batches?: Record<string, string>;
+  bulk_data?: Array<{
+    usn: string;
+    name: string;
+    email: string;
+    phone?: string;
+    batch_id?: string;
+    course_id?: string;
+    cycle?: string;
+    parent_name?: string;
+    parent_contact?: string;
+    emergency_contact?: string;
+    blood_group?: string;
+    mode_of_admission?: string;
+    date_of_admission?: string;
+  }>;
+  page?: number;
+  page_size?: number;
+}
+
+interface ManageStudentsResponse {
+  // For GET requests (DRF pagination)
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: Array<{
+    student_id: string;
+    usn: string;
+    name: string;
+    email: string | null;
+    phone: string;
+    semester: string;
+    section: string | null;
+    batch: string | null;
+    mode_of_admission?: string;
+    cycle?: string;
+    course: string | null;
+    proctor: string | null;
+    date_of_admission: string | null;
+    parent_name: string;
+    parent_contact: string;
+    emergency_contact: string;
+    blood_group: string;
+    cycle: string;
+  }>;
+  // For POST requests (actions)
+  success?: boolean;
+  message?: string;
+  data?: {student_id: string;} | {created_count: number;updated_count: number;} | {registered_count?: number;removed_count?: number;failed?: any[];};
+}
+
+interface ManageBatchesRequest {
+  start_year?: number;
+  end_year?: number;
+}
+
+interface ManageBatchesResponse {
+  success: boolean;
+  message?: string;
+  batches?: Batch[];
+  batch?: Batch;
+}
+
+export interface LabBatchItem {
+  id: string;
+  name: string;
+}
+
+export interface Subject {
+  id: string;
+  name: string;
+  subject_code: string;
+  semester_id: string;
+  subject_type: string;
+  credits?: number;
+  max_cie_marks?: number;
+  max_see_marks?: number;
+  lab_batches?: LabBatchItem[];
+}
+
+interface GetSubjectsResponse {
+  success: boolean;
+  message?: string;
+  data?: Subject[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  current_page?: number;
+  total_pages?: number;
+}
+
+interface ManageSubjectsRequest {
+  action: "create" | "update" | "delete";
+  subject_id?: string;
+  name?: string;
+  subject_code?: string;
+  semester_id?: string;
+  branch_id: string;
+  subject_type?: string;
+  credits?: number;
+  max_cie_marks?: number;
+  max_see_marks?: number;
+  lab_batches?: string[];
+}
+
+interface ManageSubjectsResponse {
+  success: boolean;
+  message?: string;
+  data?: {subject_id: string;subject_code: string;lab_batches?: LabBatchItem[];};
+}
+
+interface FacultyAssignment {
+  id: string;
+  faculty: string;
+  subject: string;
+  semester: number;
+  section: string;
+  faculty_id: string;
+  subject_id: string;
+  semester_id: string;
+  section_id: string;
+}
+
+interface ManageFacultyAssignmentsRequest {
+  action?: "create" | "update" | "delete";
+  assignment_id?: string;
+  faculty_id?: string;
+  subject_id?: string;
+  semester_id?: string;
+  section_id?: string;
+  branch_id: string;
+  page?: number;
+  search?: string;
+}
+
+interface ManageFacultyAssignmentsResponse {
+  success: boolean;
+  message?: string;
+  data?: {assignments?: FacultyAssignment[];assignment_id?: string;};
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  total_pages?: number;
+  current_page?: number;
+}
+
+interface TimetableEntry {
+  id: string;
+  faculty_assignment: {
+    id: string;
+    faculty: string;
+    subject: string;
+    semester: number;
+    section: string;
+  };
+  day: string;
+  start_time: string;
+  end_time: string;
+  room: string;
+  attendance_taken_today?: boolean;
+}
+
+interface ManageTimetableRequest {
+  action: "create" | "update" | "delete" | "bulk_create" | "create_group" | "delete_group" | "GET";
+  timetable_id?: string;
+  assignment_id?: string;
+  subject_type?: string;
+  day?: string;
+  start_time?: string;
+  end_time?: string;
+  slot_id?: string;
+  room?: string;
+  semester_id: string;
+  section_id: string;
+  branch_id: string;
+  file?: File;
+  force?: boolean;
+}
+
+interface ManageTimetableResponse {
+  success: boolean;
+  message?: string;
+  conflict_warning?: boolean;
+  conflicts?: string[];
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+  next?: string | null;
+  previous?: string | null;
+  data?: {timetable_id?: string;timetable_ids?: string[];created_count?: number;errors?: string[];} | TimetableEntry[];
+}
+
+interface Leave {
+  id: string;
+  title: string;
+  date: string;
+  reason: string;
+  status: string;
+}
+
+interface ManageHODLeavesRequest {
+  branch_id: string;
+  title?: string;
+  start_date?: string;
+  end_date?: string;
+  reason?: string;
+}
+
+interface ManageHODLeavesResponse {
+  success: boolean;
+  message?: string;
+  data?: Leave[] | Leave;
+}
+
+interface ManageLeavesRequest {
+  branch_id: string;
+  action?: "update";
+  leave_id?: string;
+  status?: "APPROVED" | "REJECTED";
+}
+
+interface ManageLeavesResponse {
+  success: boolean;
+  message?: string;
+  data?: {leaves?: Leave[];leave_id?: string;status?: string;};
+}
+
+interface GetAttendanceParams {
+  semester_id?: string;
+  section_id?: string;
+  subject_id?: string;
+  branch_id: string;
+  page?: number;
+  page_size?: number;
+}
+
+interface AttendanceRecord {
+  id: string;
+  subject: string;
+  semester: number;
+  section: string;
+  date: string;
+}
+
+interface GetAttendanceResponse {
+  success: boolean;
+  message?: string;
+  data?: {records: AttendanceRecord[];};
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  total_pages?: number;
+  current_page?: number;
+}
+
+interface GetMarksParams {
+  semester_id?: string;
+  section_id?: string;
+  subject_id?: string;
+  branch_id: string;
+}
+
+interface TestMark {
+  test_number: number;
+  mark: number;
+  max_mark: number;
+}
+
+interface Mark {
+  student_id: string;
+  student: string;
+  usn: string;
+  subject: string;
+  subject_id: string;
+  average_mark: number;
+  test_marks: TestMark[];
+}
+
+interface GetMarksResponse {
+  success: boolean;
+  message?: string;
+  data?: {marks: Mark[];};
+}
+
+interface CreateAnnouncementRequest {
+  title: string;
+  content: string;
+  target: "faculty" | "students" | "both";
+  branch_id: string;
+}
+
+interface CreateAnnouncementResponse {
+  success: boolean;
+  message?: string;
+  data?: {announcement_id: string;};
+}
+
+interface SendNotificationRequest {
+  action: "notify" | "notify_all" | "notify_low_attendance";
+  title: string;
+  student_id?: string;
+  student_ids?: string[];
+  message: string;
+  target?: "student" | "teacher" | "all";
+  branch_id: string;
+  semester_id?: string;
+  section_id?: string;
+  subject_id?: string;
+  threshold?: number;
+  subject_type?: string;
+  credits?: number;
+  max_cie_marks?: number;
+  max_see_marks?: number;
+}
+
+interface SendNotificationResponse {
+  success: boolean;
+  message?: string;
+  task_id?: string;
+  success_count?: number;
+  failed_count?: number;
+}
+
+interface AssignProctorRequest {
+  student_id: string;
+  faculty_id: string;
+  branch_id: string;
+}
+
+interface AssignProctorResponse {
+  success: boolean;
+  message?: string;
+  data?: {student_id: string;faculty_id: string;};
+}
+
+interface AssignProctorsBulkRequest {
+  usns?: string[];
+  student_ids?: string[];
+  faculty_id: string;
+  branch_id: string;
+}
+
+interface AssignProctorsBulkResponse {
+  success: boolean;
+  message?: string;
+}
+
+interface ChatChannel {
+  id: string;
+  name: string;
+  type: string;
+  subject: string | null;
+  section: string | null;
+  last_message: string | null;
+}
+
+interface ManageChatRequest {
+  action: "create_channel" | "send_message";
+  channel_id?: string;
+  name?: string;
+  channel_type?: "subject" | "section" | "private" | "faculty";
+  subject_id?: string;
+  section_id?: string;
+  participant_ids?: string[];
+  content?: string;
+  branch_id: string;
+}
+
+interface ManageChatResponse {
+  success: boolean;
+  message?: string;
+  data?: {channels?: ChatChannel[];channel_id?: string;message_id?: string;};
+}
+
+interface ManageProfileRequest {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  mobile_number?: string;
+  address?: string;
+  bio?: string;
+}
+
+interface ManageProfileResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    username: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    mobile_number: string;
+    address: string;
+    bio: string;
+    branch: string;
+    branch_id: string;
+  };
+}
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  role: string;
+  created_at: string;
+  created_by?: string;
+}
+
+interface GetNotificationsResponse {
+  success: boolean;
+  message?: string;
+  data?: Notification[];
+}
+
+interface PromoteStudentsRequest {
+  from_semester_id: string;
+  to_semester_id: string;
+  section_id?: string;
+  batch_id?: string;
+  branch_id: string;
+  student_ids?: string[];
+}
+
+interface PromoteStudentsResponse {
+  success: boolean;
+  message?: string;
+  promoted?: Array<{
+    usn: string;
+    name: string;
+    from_semester: number;
+    to_semester: number;
+    section?: string;
+  }>;
+  failed?: Array<{
+    usn: string;
+    name: string;
+    reason: string;
+  }>;
+}
+
+interface PromoteSelectedStudentsRequest {
+  student_ids: string[];
+  to_semester_id: string;
+  branch_id: string;
+}
+
+interface PromoteSelectedStudentsResponse {
+  success: boolean;
+  message?: string;
+  promoted?: Array<{
+    usn: string;
+    name: string;
+    from_semester: number;
+    to_semester: number;
+    section?: string;
+  }>;
+  failed?: Array<{
+    usn: string;
+    name: string;
+    reason: string;
+  }>;
+}
+
+interface DemoteStudentRequest {
+  student_id: string;
+  to_semester_id: string;
+  branch_id: string;
+  reason: string;
+  remarks?: string;
+  section_id?: string;
+}
+
+interface DemoteStudentResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    student_usn: string;
+    student_name: string;
+    from_semester: number;
+    to_semester: number;
+    reason: string;
+    remarks: string;
+    section?: string;
+  };
+}
+
+interface BulkDemoteStudentsRequest {
+  student_ids: string[];
+  to_semester_id: string;
+  branch_id: string;
+  reason: string;
+  remarks?: string;
+  section_id?: string;
+}
+
+interface BulkDemoteStudentsResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    demoted_students: Array<{
+      usn: string;
+      name: string;
+      from_semester: number;
+      to_semester: number;
+      section?: string;
+    }>;
+    failed_students: Array<{
+      usn: string;
+      name: string;
+      reason: string;
+    }>;
+    demoted_count: number;
+    failed_count: number;
+    target_semester: number;
+  };
+}
+
+interface PromotionEligibility {
+  student_id: string;
+  usn: string;
+  name: string;
+  is_eligible: boolean;
+  failed_subjects: string[];
+  attendance_percentage: number;
+}
+
+interface GetPromotionEligibilityParams {
+  semester_id: string;
+  section_id?: string;
+  branch_id: string;
+}
+
+interface GetPromotionEligibilityResponse {
+  success: boolean;
+  message?: string;
+  data?: {students: PromotionEligibility[];};
+}
+
+interface ExamFailure {
+  id: string;
+  student_id: string;
+  usn: string;
+  name: string;
+  subject_id: string;
+  subject_name: string;
+  semester_id: string;
+  semester_number: number;
+  failure_date: string;
+}
+
+interface GetExamFailuresParams {
+  semester_id?: string;
+  section_id?: string;
+  subject_id?: string;
+  branch_id: string;
+}
+
+interface GetExamFailuresResponse {
+  success: boolean;
+  message?: string;
+  data?: {failures: ExamFailure[];};
+}
+
+interface RecordExamFailureRequest {
+  student_id: string;
+  subject_id: string;
+  semester_id: string;
+  branch_id: string;
+  failure_date: string;
+}
+
+interface RecordExamFailureResponse {
+  success: boolean;
+  message?: string;
+  data?: {failure_id: string;};
+}
+
+interface UploadStudyMaterialRequest {
+  title: string;
+  subject_name?: string;
+  subject_code?: string;
+  semester_id: string;
+  branch_id: string;
+  section_ids?: string[];
+  file_url: string;
+}
+
+interface GetR2PresignedUrlResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    url: string;
+    file_url: string;
+  };
+}
+
+interface StudyMaterial {
+  id: string;
+  title: string;
+  subject_name: string;
+  subject_code: string;
+  semester_id: string;
+  branch_id: string;
+  section_id?: string | null;
+  section?: string | null;
+  uploaded_by: string;
+  uploaded_at: string;
+  file_url: string;
+}
+
+interface UploadStudyMaterialResponse {
+  success: boolean;
+  message?: string;
+  data?: StudyMaterial;
+}
+
+interface GetStudyMaterialsResponse {
+  success: boolean;
+  message?: string;
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+  data?: StudyMaterial[];
+}
+
+interface StudentPerformance {
+  student_id: string;
+  usn: string;
+  name: string;
+  subject: string;
+  attendance_percentage: number;
+  average_mark: number;
+  semester: number;
+  batch: string;
+  test_marks?: TestMark[];
+}
+
+// Utility function for error handling
+const handleApiError = (error: unknown, response?: Response): {success: boolean;message: string;} => {
+
+  if (response?.status === 404) {
+    return { success: false, message: `Resource not found: Invalid ID or endpoint (Status: 404)` };
+  } else if (response?.status === 403) {
+    return { success: false, message: "Access denied: Invalid or missing authentication token (Status: 403)" };
+  } else if (response?.status === 400) {
+    return { success: false, message: (error as Error).message || "Invalid request data (Status: 400)" };
+  } else if (response?.status === 500) {
+    return { success: false, message: "Server error: Please try again later (Status: 500)" };
+  } else if ((error as Error).message?.includes("Unexpected token")) {
+    return { success: false, message: "Server returned invalid response (possibly HTML instead of JSON)" };
+  }
+  return { success: false, message: (error as Error).message || "Network error or server issue" };
+};
+
+// API functions
+export const getBranches = async (): Promise<GetBranchesResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/branches/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+interface GetLeaveBootstrapResponse {
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: {
+    success: boolean;
+    message?: string;
+    data?: {
+      profile: {
+        username: string;
+        email: string;
+        first_name: string;
+        last_name: string;
+        mobile_number: string;
+        address: string;
+        bio: string;
+        branch: string;
+        branch_id: string;
+      };
+      leaves: Array<{
+        id: number;
+        faculty_name: string;
+        department: string;
+        start_date: string;
+        end_date: string;
+        reason: string;
+        status: string;
+      }>;
+    };
+  };
+  // Fallback for non-paginated responses
+  success?: boolean;
+  message?: string;
+  data?: any;
+}
+
+export const getLeaveBootstrap = async (
+params: {branch_id?: string;page?: number;status?: string;date_from?: string;} = {})
+: Promise<GetLeaveBootstrapResponse> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.branch_id) queryParams.append("branch_id", params.branch_id);
+    if (params.page) queryParams.append("page", params.page.toString());
+    if (params.status) queryParams.append("status", params.status);
+    if (params.date_from) queryParams.append("date_from", params.date_from);
+
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/leave-bootstrap/?${queryParams.toString()}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getFacultyLeavesBootstrap = async (
+branch_id?: string,
+filters?: {
+  status?: string;
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  page_size?: number;
+})
+: Promise<GetLeaveBootstrapResponse> => {
+  try {
+    const params: Record<string, string> = {};
+    if (branch_id) params.branch_id = branch_id;
+    if (filters?.status && filters.status !== 'All') params.status = filters.status;
+    if (filters?.search) params.search = filters.search;
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.page) params.page = filters.page.toString();
+    if (filters?.page_size) params.page_size = filters.page_size.toString();
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/faculty-leaves-bootstrap/${query ? '?' + query : ''}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+interface GetProctorBootstrapResponse {
+  success: boolean;
+  message?: string;
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  data?: {
+    profile: {
+      username: string;
+      email: string;
+      first_name: string;
+      last_name: string;
+      mobile_number: string;
+      address: string;
+      bio: string;
+      branch: string;
+      branch_id: string;
+    };
+    students: Array<{
+      usn: string;
+      name: string;
+      semester: number | null;
+      branch: string;
+      section: string | null;
+      proctor: string | null;
+    }>;
+    proctors: Array<{
+      id: string;
+      name: string;
+      first_name: string;
+      last_name: string;
+    }>;
+    semesters: Array<{id: string;number: number;}>;
+    sections: Array<{id: string;name: string;semester_id: string;}>;
+  };
+}
+
+export const getProctorBootstrap = async (
+branch_id?: string)
+: Promise<GetProctorBootstrapResponse> => {
+  try {
+    const params: Record<string, string> = {};
+    if (branch_id) params.branch_id = branch_id;
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/proctor-bootstrap/${query ? '?' + query : ''}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getSemesterBootstrap = async (
+include: string[] = ['profile', 'semesters', 'sections', 'subjects'],
+branch_id?: string)
+: Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    profile?: {
+      username: string;
+      email: string;
+      first_name: string;
+      last_name: string;
+      mobile_number: string;
+      address: string;
+      bio: string;
+      branch: string;
+      branch_id: string;
+    };
+    branches?: Branch[];
+    semesters?: Array<{id: string;number: number;}>;
+    sections?: Array<{id: string;name: string;semester_id: string | null;}>;
+    subjects?: Array<{id: string;name: string;subject_code: string;semester_id: string | null;}>;
+  };
+}> => {
+  try {
+    const params: Record<string, string> = {};
+    params.include = include.join(',');
+    if (branch_id) params.branch_id = branch_id;
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/semester-bootstrap/?${query}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getElectiveEnrollmentBootstrap = async (include: string[] = ['profile', 'semesters', 'sections']): Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    profile: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      branch: string;
+      branch_id: string;
+    };
+    semesters: Array<{id: string;number: number;}>;
+    sections: Array<{id: string;name: string;semester_id: string | null;}>;
+    elective_subjects: Array<{
+      id: string;
+      name: string;
+      subject_code: string;
+      semester_id: string | null;
+      subject_type: string;
+      credits: number;
+    }>;
+  };
+}> => {
+  try {
+    const params = new URLSearchParams({ include: include.join(',') }).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/elective-enrollment-bootstrap/?${params}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+const hodStatsPromises: Record<string, {promise: Promise<HODStatsResponse>;timestamp: number;}> = {};
+
+export const getHODStats = async (branch_id: string = ''): Promise<HODStatsResponse> => {
+
+  const now = Date.now();
+  const cached = hodStatsPromises[branch_id];
+  if (cached && now - cached.timestamp < 5000) {
+    return cached.promise;
+  }
+
+  const promise = (async () => {
+    try {
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/dashboard-stats/?branch_id=${branch_id}&light=true`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
+      return await response.json();
+    } catch (error: unknown) {
+      return handleApiError(error, (error as any).response);
+    }
+  })();
+
+  hodStatsPromises[branch_id] = { promise, timestamp: now };
+  return promise;
+};
+
+// Combined HOD dashboard (stats + leaves in one call)
+export const getHODDashboard = async (
+branch_id: string)
+: Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    overview?: {
+      faculty_count: number;
+      student_count: number;
+      pending_leaves: number;
+    };
+    attendance_trend?: Array<{
+      week: string;
+      start_date: string;
+      end_date: string;
+      attendance_percentage: number;
+    }>;
+    leaves?: Array<any>;
+  };
+}> => {
+  try {
+    if (!branch_id) throw new Error("Branch ID is required");
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/dashboard/?branch_id=${branch_id}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response) as any;
+  }
+};
+
+// Combined HOD dashboard bootstrap (profile + stats + leaves in one call)
+export const getHODDashboardBootstrap = async (
+include: string[] = ['profile', 'overview', 'attendance_trend', 'leaves', 'semesters', 'sections'])
+: Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    profile?: {
+      username: string;
+      email: string;
+      first_name: string;
+      last_name: string;
+      mobile_number: string;
+      address: string;
+      bio: string;
+      branch: string;
+      branch_id: string;
+    };
+    semesters?: Array<{id: string;number: number;}>;
+    sections?: Array<{id: string;name: string;semester_id: string | null;}>;
+    overview?: {
+      faculty_count: number;
+      student_count: number;
+      pending_leaves: number;
+    };
+    attendance_trend?: Array<{
+      week: string;
+      start_date: string;
+      end_date: string;
+      attendance_percentage: number | string;
+    }>;
+    leaves?: Array<{
+      id: number;
+      faculty_name: string;
+      department: string;
+      start_date: string;
+      end_date: string;
+      reason: string;
+      status: string;
+    }>;
+    faculty_attendance_today?: {
+      summary: {
+        total_faculty: number;
+        present: number;
+        absent: number;
+        not_marked: number;
+      };
+    };
+  };
+}> => {
+  try {
+    const params: Record<string, string> = {};
+    params.include = include.join(',');
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/dashboard/?${query}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response) as any;
+  }
+};
+
+export const getLowAttendanceBootstrap = async (
+branch_id?: string,
+filters: {semester_id?: string;section_id?: string;subject_id?: string;threshold?: number;page?: number;page_size?: number;} = {})
+: Promise<{
+  success: boolean;
+  message?: string;
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  data?: {
+    profile: {
+      username: string;
+      email: string;
+      first_name: string;
+      last_name: string;
+      mobile_number: string;
+      address: string;
+      bio: string;
+      branch: string;
+      branch_id: string;
+    };
+    semesters: Array<{id: string;number: number;}>;
+    sections: Array<{id: string;name: string;semester_id: string;}>;
+    subjects: Array<{id: string;name: string;subject_code: string;semester_id: string;}>;
+    low_attendance: {
+      students: Array<{
+        student_id: string;
+        usn: string;
+        name: string;
+        attendance_percentage: number;
+        total_sessions: number;
+        present_sessions: number;
+        semester: number | null;
+        section: string | null;
+        batch: string | null;
+        subject: string;
+      }>;
+    };
+    pagination: {
+      page: number;
+      page_size: number;
+      total_students: number;
+      total_pages: number;
+    };
+  };
+}> => {
+  try {
+    const params: Record<string, string> = {};
+    if (branch_id) params.branch_id = branch_id;
+    if (filters.semester_id) params.semester_id = filters.semester_id;
+    if (filters.section_id) params.section_id = filters.section_id;
+    if (filters.subject_id) params.subject_id = filters.subject_id;
+    if (filters.threshold) params.threshold = filters.threshold.toString();
+    if (filters.page) params.page = filters.page.toString();
+    if (filters.page_size) params.page_size = filters.page_size.toString();
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/low-attendance-bootstrap/${query ? '?' + query : ''}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getLowAttendanceStudents = async (
+branch_id?: string,
+filters: {batch_id?: string;semester_id?: string;section_id?: string;subject_id?: string;threshold?: number;page?: number;page_size?: number;} = {})
+: Promise<{
+  success: boolean;
+  message?: string;
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+  next?: string | null;
+  previous?: string | null;
+  data?: {
+    students: Array<{
+      student_id: string;
+      usn: string;
+      name: string;
+      attendance_percentage: number | string;
+      total_sessions: number;
+      present_sessions: number;
+      semester: number | null;
+      section: string | null;
+      batch: string | null;
+      subject: string;
+      subjects_breakdown?: Array<{ name: string; avg: number; total?: number; present?: number }>;
+      recently_notified: boolean;
+    }>;
+    stats?: {
+      total_students: number;
+      low_attendance_count: number;
+      avg_attendance: number;
+    };
+  };
+  results?: {
+    students: Array<any>;
+    stats: any;
+  }
+}> => {
+  try {
+    const params: Record<string, string> = {};
+    if (branch_id) params.branch_id = branch_id;
+    if (filters.batch_id) params.batch_id = filters.batch_id;
+    if (filters.semester_id) params.semester_id = filters.semester_id;
+    if (filters.section_id) params.section_id = filters.section_id;
+    if (filters.subject_id) params.subject_id = filters.subject_id;
+    if (filters.threshold) params.threshold = filters.threshold.toString();
+    if (filters.page) params.page = filters.page.toString();
+    if (filters.page_size) params.page_size = filters.page_size.toString();
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/low-attendance/${query ? '?' + query : ''}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getLowPerformanceStudents = async (
+branch_id?: string,
+filters: {batch_id?: string;semester_id?: string;section_id?: string;subject_id?: string;threshold?: number;page?: number;page_size?: number;} = {})
+: Promise<{
+  success: boolean;
+  message?: string;
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+  next?: string | null;
+  previous?: string | null;
+  data?: {
+    students: Array<{
+      student_id: string;
+      usn: string;
+      name: string;
+      attendance_percentage: number | string;
+      performance_percentage: number | string;
+      total_sessions: number;
+      present_sessions: number;
+      semester: number | null;
+      section: string | null;
+      batch: string | null;
+      subject: string;
+      subjects_breakdown?: Array<{ name: string; avg: number }>;
+      recently_notified: boolean;
+    }>;
+    stats?: {
+      total_students: number;
+      low_attendance_count?: number;
+      low_performance_count: number;
+      avg_attendance?: number;
+      avg_performance: number;
+    };
+  };
+  results?: {
+    students: Array<any>;
+    stats: any;
+  }
+}> => {
+  try {
+    const params: Record<string, string> = {};
+    if (branch_id) params.branch_id = branch_id;
+    if (filters.batch_id) params.batch_id = filters.batch_id;
+    if (filters.semester_id) params.semester_id = filters.semester_id;
+    if (filters.section_id) params.section_id = filters.section_id;
+    if (filters.subject_id) params.subject_id = filters.subject_id;
+    if (filters.threshold) params.threshold = filters.threshold.toString();
+    if (filters.page) params.page = filters.page.toString();
+    if (filters.page_size) params.page_size = filters.page_size.toString();
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/low-performance/${query ? '?' + query : ''}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+
+export const getAttendanceBootstrap = async (
+branch_id?: string,
+filters: {semester_id?: string;section_id?: string;subject_id?: string;search?: string;page?: number;page_size?: number;} = {})
+: Promise<GetAttendanceBootstrapResponse> => {
+  try {
+    const params: Record<string, string> = {};
+    if (branch_id) params.branch_id = branch_id;
+    if (filters.semester_id) params.semester_id = filters.semester_id;
+    if (filters.section_id) params.section_id = filters.section_id;
+    if (filters.subject_id) params.subject_id = filters.subject_id;
+    if (filters.search) params.search = filters.search;
+    if (filters.page) params.page = filters.page.toString();
+    if (filters.page_size) params.page_size = filters.page_size.toString();
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/attendance-bootstrap/${query ? '?' + query : ''}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getMarksBootstrap = async (
+branch_id?: string,
+filters: {semester_id?: string;section_id?: string;subject_id?: string;page?: number;page_size?: number;} = {})
+: Promise<{
+  success: boolean;
+  message?: string;
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+  next?: string | null;
+  previous?: string | null;
+  data?: {
+    profile: {
+      username: string;
+      email: string;
+      first_name: string;
+      last_name: string;
+      mobile_number: string;
+      address: string;
+      bio: string;
+      branch: string;
+      branch_id: string;
+    };
+    semesters: Array<{id: string;number: number;}>;
+    sections: Array<{id: string;name: string;semester_id: string;}>;
+    subjects: Array<{id: string;name: string;subject_code: string;semester_id: string;}>;
+    performance: Array<{
+      subject: string;
+      marks: number;
+      attendance: number;
+      semester: string;
+    }>;
+    marks: Array<{
+      student_id: string;
+      student: string;
+      usn: string;
+      subject: string;
+      subject_id: string;
+      average_mark: number;
+      test_marks: Array<{
+        test_number: number;
+        mark: number;
+        max_mark: number;
+      }>;
+    }>;
+    pagination: {
+      page: number;
+      page_size: number;
+      total_students: number;
+      total_pages: number;
+    };
+  };
+}> => {
+  try {
+    const params: Record<string, string> = {};
+    if (branch_id) params.branch_id = branch_id;
+    if (filters.semester_id) params.semester_id = filters.semester_id;
+    if (filters.section_id) params.section_id = filters.section_id;
+    if (filters.subject_id) params.subject_id = filters.subject_id;
+    if (filters.page) params.page = filters.page.toString();
+    if (filters.page_size) params.page_size = filters.page_size.toString();
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/marks-bootstrap/${query ? '?' + query : ''}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getStudentOptions = async (branch_id: string): Promise<GetStudentOptionsResponse> => {
+  try {
+    if (!branch_id) throw new Error("Branch ID is required");
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/student-options/?branch_id=${branch_id}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getSemesters = async (branch_id: string, page?: number): Promise<GetSemestersResponse> => {
+  try {
+    if (!branch_id) throw new Error("Branch ID is required");
+    let url = `${API_ENDPOINT}/hod/semesters/?branch_id=${branch_id}`;
+    if (page) url += `&page=${page}`;
+    const response = await fetchWithTokenRefresh(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    const data = await response.json();
+    if (data.results && data.results.success) {
+      return { ...data, ...data.results };
+    }
+    return data;
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const manageSemesters = async (data: ManageSemestersRequest): Promise<ManageSemestersResponse> => {
+  try {
+    if (!data.branch_id) throw new Error("Branch ID is required");
+    if (data.action === "create" && !data.number) throw new Error("Semester number is required for create action");
+    if (data.action === "update" && (!data.semester_id || !data.number)) throw new Error("Semester ID and number are required for update action");
+    if (data.action === "delete" && !data.semester_id) throw new Error("Semester ID is required for delete action");
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/semesters/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const manageSections = async (
+data: ManageSectionsRequest | {branch_id: string;semester_id?: string;},
+method: "GET" | "POST" = "GET")
+: Promise<GetSectionsResponse> => {
+  try {
+    const branch_id = (data as {branch_id: string;}).branch_id;
+    if (!branch_id) throw new Error("Branch ID is required");
+    let url = `${API_ENDPOINT}/hod/sections/?branch_id=${branch_id}`;
+    if (method === "GET" && (data as any).semester_id) {
+      url += `&semester_id=${(data as any).semester_id}`;
+    }
+    if (method === "POST") {
+      const req = data as ManageSectionsRequest;
+      if (!req.action) throw new Error("Action is required for POST requests");
+      if (req.action === "create" && (!req.name || !req.semester_id)) {
+        throw new Error("Name and Semester ID are required for create action");
+      }
+      if (req.action === "update" && (!req.section_id || !req.name || !req.semester_id)) {
+        throw new Error("Section ID, Name, and Semester ID are required for update action");
+      }
+      if (req.action === "delete" && !req.section_id) {
+        throw new Error("Section ID is required for delete action");
+      }
+    }
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: method === "POST" ? JSON.stringify(data) : undefined
+
+    });
+    const dataRes = await response.json();
+    if (dataRes.results && dataRes.results.success) {
+      return { ...dataRes, ...dataRes.results };
+    }
+    return dataRes;
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+// Combined semester data: sections + subjects + faculty assignments
+export const getHODTimetableSemesterData = async (semester_id: string, include: string = "sections,subjects,faculty_assignments"): Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    sections: Array<{id: string;name: string;semester_id: string;}>;
+    subjects: Array<{id: string;name: string;subject_code: string;semester_id: string;}>;
+    faculty_assignments: Array<{
+      id: string;
+      faculty: string;
+      faculty_id: string;
+      faculty_name: string;
+      subject: string;
+      subject_id: string;
+      section: string;
+      section_id: string;
+      semester: number;
+      semester_id: string;
+    }>;
+  };
+}> => {
+  try {
+    if (!semester_id) throw new Error("Semester ID is required");
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/timetable-semester-data/?semester_id=${semester_id}&include=${include}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response) as any;
+  }
+};
+
+// Combined bootstrap: profile + semesters + sections
+export const getHODBootstrap = async (): Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    profile: {first_name?: string;last_name?: string;email?: string;branch?: string;branch_id: string;};
+    semesters: Array<{id: string;number: number;}>;
+    sections: Array<{id: string;name: string;semester_id: string | null;}>;
+  };
+}> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/bootstrap/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response) as any;
+  }
+};
+
+// Student management bootstrap (profile + semesters + sections + batches + performance)
+// Note: Students are fetched separately via manageStudents for pagination
+export const getHODStudentBootstrap = async (
+include: string[] = ['profile', 'semesters', 'sections', 'batches', 'performance'],
+page?: number)
+: Promise<{
+  success: boolean;
+  message?: string;
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  data?: {
+    profile?: {branch_id: string;};
+    semesters?: Array<{id: string;number: number;}>;
+    sections?: Array<{id: string;name: string;semester_id: string | null;}>;
+    batches?: Array<{id: number;name: string;start_year: number;end_year: number;}>;
+    performance?: Array<{subject: string;attendance: number;marks: number;semester: string;}>;
+  };
+}> => {
+  try {
+    const params: Record<string, string> = {};
+    params.include = include.join(',');
+    if (page) params.page = page.toString();
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/student-bootstrap/?${query}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response) as any;
+  }
+};
+export const manageSubjects = async (
+data: ManageSubjectsRequest | {branch_id: string;semester_id?: string;page?: number;page_size?: number;},
+method: "GET" | "POST" = "GET")
+: Promise<GetSubjectsResponse> => {
+  try {
+    const branch_id = (data as {branch_id: string;}).branch_id;
+    if (!branch_id) throw new Error("Branch ID is required");
+    let url = `${API_ENDPOINT}/hod/subjects/?branch_id=${branch_id}`;
+    if (method === "GET") {
+      const params = new URLSearchParams({ branch_id });
+      if ((data as any).semester_id) params.append("semester_id", (data as any).semester_id);
+      if ((data as any).subject_type) params.append("subject_type", (data as any).subject_type);
+      if ((data as any).page) params.append("page", (data as any).page.toString());
+      if ((data as any).page_size) params.append("page_size", (data as any).page_size.toString());
+      url = `${API_ENDPOINT}/hod/subjects/?${params.toString()}`;
+    }
+    if (method === "POST") {
+      const req = data as ManageSubjectsRequest;
+      if (!req.action) throw new Error("Action is required for POST requests");
+      if (req.action === "create" && (!req.name || !req.semester_id || !req.subject_code)) {
+        throw new Error("Name, Semester ID, and Subject Code are required for create action");
+      }
+      if (req.action === "update" && (!req.subject_id || !req.name || !req.semester_id || !req.subject_code)) {
+        throw new Error("Subject ID, Name, Semester ID, and Subject Code are required for update action");
+      }
+      if (req.action === "delete" && !req.subject_id) {
+        throw new Error("Subject ID is required for delete action");
+      }
+    }
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: method === "POST" ? JSON.stringify(data) : undefined
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+// Subject management bootstrap (profile + semesters)
+// Use include parameter to control what data is returned
+export const getHODSubjectBootstrap = async (include: string[] = ['profile', 'semesters']): Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    profile?: {branch_id: string;};
+    semesters?: Array<{id: string;number: number;}>;
+    subjects?: Array<{id: string;name: string;subject_code: string;semester_id: string | null;subject_type: string;}>;
+    faculties?: Array<{id: string;username: string;first_name: string;last_name: string | null;}>;
+    assignments?: Array<{id: string;faculty: string;subject: string;section: string;semester: number;faculty_id: string;subject_id: string;section_id: string;semester_id: string;}>;
+  };
+}> => {
+  try {
+    const includeParam = include.join(',');
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/subject-bootstrap/?include=${includeParam}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response) as any;
+  }
+};
+export const manageStudents = async (
+data: ManageStudentsRequest | {branch_id: string;semester_id?: string;section_id?: string;batch_id?: string;page?: number;page_size?: number;},
+method: "GET" | "POST" = "GET")
+: Promise<ManageStudentsResponse> => {
+  // Simple in-memory cache to avoid immediate GET after a recent POST
+  // Keyed by query string for GET requests
+  const studentsCacheKey = (paramsStr: string) => `students:${paramsStr}`;
+  // Load/store helpers
+  const cacheStore: Map<string, any> = (manageStudents as any)._cache || new Map();
+  (manageStudents as any)._cache = cacheStore;
+  try {
+    const branch_id = (data as {branch_id: string;}).branch_id;
+    if (!branch_id) throw new Error("Branch ID is required");
+    let url = `${API_ENDPOINT}/hod/students/?branch_id=${branch_id}`;
+    if (method === "GET") {
+      const params = new URLSearchParams({ branch_id });
+      if ((data as any).semester_id) params.append("semester_id", (data as any).semester_id);
+      if ((data as any).section_id) params.append("section_id", (data as any).section_id);
+      if ((data as any).batch_id) params.append("batch_id", (data as any).batch_id);
+      if ((data as any).search) params.append("search", (data as any).search);
+      if ((data as any).subject_id) params.append("subject_id", (data as any).subject_id);
+      if ((data as any).cycle) params.append("cycle", (data as any).cycle);
+      if ((data as any).page) params.append("page", (data as any).page.toString());
+      if ((data as any).page_size) params.append("page_size", (data as any).page_size.toString());
+      url = `${API_ENDPOINT}/hod/students/?${params.toString()}`;
+
+      // Optionally suppress immediate GETs that follow a recent POST to the students endpoint
+      // If caller explicitly requests a force refresh (`force_refresh: true`) skip suppression and fetch fresh.
+      const forceRefresh = !!(data as any).force_refresh;
+      if (!forceRefresh) {
+        const lastPost = Number(localStorage.getItem('last_students_post_ts') || '0');
+        const now = Date.now();
+        const key = studentsCacheKey(params.toString());
+        // Try in-memory cache first
+        if (lastPost && now - lastPost < 2000 && cacheStore.has(key)) {
+          return cacheStore.get(key);
+        }
+        // Fall back to localStorage cache (across tabs/reloads)
+        if (lastPost && now - lastPost < 2000) {
+          try {
+            const cached = localStorage.getItem(`students_cache:${params.toString()}`);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              cacheStore.set(key, parsed);
+              return parsed;
+            }
+          } catch (e) {
+
+            // ignore
+          }}
+      }
+    }
+    if (method === "POST") {
+      const req = data as ManageStudentsRequest;
+      if (!req.action) throw new Error("Action is required for POST requests");
+      if (req.action === "create" && (!req.usn || !req.name || !req.email || !req.semester_id || !req.section_id || !req.batch_id)) {
+        throw new Error("USN, Name, Email, Semester ID, Section ID, and Batch ID are required for create action");
+      }
+      if (req.action === "update" && (!req.student_id || !req.name || !req.email || !req.semester_id || !req.section_id)) {
+        throw new Error("Student ID, Name, Email, Semester ID, and Section ID are required for update action");
+      }
+      if (req.action === "delete" && !req.student_id) {
+        throw new Error("Student ID is required for delete action");
+      }
+      if (req.action === "bulk_update") {
+        if (!req.semester_id || !req.section_id) {
+          throw new Error("Semester ID and Section ID are required for bulk_update action");
+        }
+        if (!req.bulk_data || !Array.isArray(req.bulk_data) || req.bulk_data.length === 0) {
+          throw new Error("Bulk data must be a non-empty array for bulk_update action");
+        }
+        for (const entry of req.bulk_data) {
+          if (!entry.usn || !entry.name) {
+            throw new Error("Each bulk data entry must include USN and Name");
+          }
+        }
+      }
+      if (req.action === "register_subjects" && (!req.student_id || !req.subject_ids || !Array.isArray(req.subject_ids))) {
+        throw new Error("Student ID and subject IDs array are required for register_subjects action");
+      }
+      if (req.action === "bulk_unregister_subjects") {
+        if (!req.subject_id || !req.student_ids || !Array.isArray(req.student_ids) || req.student_ids.length === 0) {
+          throw new Error("subject_id and student_ids array are required for bulk_unregister_subjects action");
+        }
+      }
+      if (req.action === "bulk_register_subjects") {
+        if (!req.subject_id || !req.student_ids || !Array.isArray(req.student_ids) || req.student_ids.length === 0) {
+          throw new Error("subject_id and student_ids array are required for bulk_register_subjects action");
+        }
+      }
+      if (req.action === "get_enrollment_status") {
+        if (!req.subject_id || !req.student_ids || !Array.isArray(req.student_ids) || req.student_ids.length === 0) {
+          throw new Error("subject_id and student_ids array are required for get_enrollment_status action");
+        }
+      }
+    }
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: method === "POST" ? JSON.stringify(data) : undefined
+
+    });
+    const rawResult = await response.json();
+    const result = rawResult.results && rawResult.results.success ? { ...rawResult, ...rawResult.results } : rawResult;
+
+    // Cache GET responses for students endpoint (in-memory and localStorage)
+    if (method === 'GET') {
+      try {
+        const paramsStr = url.split('?')[1] || '';
+        const key = studentsCacheKey(paramsStr);
+        cacheStore.set(key, result);
+        try {
+          localStorage.setItem(`students_cache:${paramsStr}`, JSON.stringify(result));
+        } catch (e) {
+
+          // ignore localStorage write errors
+        }} catch (e) {
+
+        // ignore cache errors
+      }}
+
+    // Mark timestamp on successful POST to suppress immediate following GETs
+    // and invalidate any cached students results so subsequent GETs fetch fresh data.
+    if (method === 'POST') {
+      try {
+
+        localStorage.setItem('last_students_post_ts', Date.now().toString());
+      } catch (e) {}
+      try {
+        // Clear in-memory cache entries for students
+        for (const k of Array.from(cacheStore.keys())) {
+          if (k.startsWith('students:')) cacheStore.delete(k);
+        }
+        // Clear localStorage student caches (best-effort)
+        try {
+          for (const key of Object.keys(localStorage)) {
+            if (key.startsWith('students_cache:')) localStorage.removeItem(key);
+          }
+        } catch (e) {}
+      } catch (e) {
+
+        // ignore cache clear errors
+      }}
+
+    return result;
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+// Timetable bootstrap (profile + branches + semesters + sections + subjects + faculties)
+export const getHODTimetableBootstrap = async (): Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    profile: {branch_id: string;branch: string;};
+    semesters: Array<{id: string;number: number;}>;
+  };
+}> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/timetable-bootstrap/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response) as any;
+  }
+};
+export const manageBatches = async (
+data?: ManageBatchesRequest,
+batch_id?: string,
+method: "GET" | "POST" | "PUT" | "DELETE" = "GET")
+: Promise<ManageBatchesResponse> => {
+  try {
+    const url = batch_id ?
+    `${API_ENDPOINT}/hod/batches/${batch_id}/` :
+    `${API_ENDPOINT}/hod/batches/`;
+    if (method === "POST" || method === "PUT") {
+      if (!data?.start_year || !data?.end_year) {
+        throw new Error("Start year and end year are required for POST/PUT requests");
+      }
+    }
+    if (method === "DELETE" && !batch_id) {
+      throw new Error("Batch ID is required for DELETE request");
+    }
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: data ? JSON.stringify(data) : undefined
+
+    });
+    const result = await response.json();
+    if (!response.ok) {
+
+      return { success: false, message: result.message || `HTTP ${response.status}` };
+    }
+    return result;
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getStudentPerformance = async (
+data: {branch_id: string;semester_id?: string;section_id?: string;})
+: Promise<{success: boolean;data?: StudentPerformance[];message?: string;}> => {
+  try {
+    if (!data.branch_id) throw new Error("Branch ID is required");
+    const params = new URLSearchParams({ branch_id: data.branch_id });
+    if (data.semester_id) params.append("semester_id", data.semester_id);
+    if (data.section_id) params.append("section_id", data.section_id);
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/performance/?${params.toString()}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const manageFaculties = async (
+params: {branch_id?: string;search?: string;page?: number;page_size?: number;},
+method: "GET" = "GET")
+: Promise<any> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.branch_id) queryParams.append("branch_id", params.branch_id);
+    if (params.search) queryParams.append("search", params.search);
+    if (params.page) queryParams.append("page", params.page.toString());
+    if (params.page_size) queryParams.append("page_size", params.page_size.toString());
+
+    const url = `${API_ENDPOINT}/hod/faculties/?${queryParams.toString()}`;
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: { "Content-Type": "application/json" }
+    });
+    const data = await response.json();
+    if (data.results && data.results.success) {
+      return { ...data, ...data.results };
+    }
+    return data;
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const listFacultyBranches = async (): Promise<GetBranchesResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/faculty-branches/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getProctors = async (branch_id: string, page?: number): Promise<any> => {
+  try {
+    if (!branch_id) throw new Error("Branch ID is required");
+    let url = `${API_ENDPOINT}/hod/proctors/list/?branch_id=${branch_id}`;
+    if (page) url += `&page=${page}`;
+    const response = await fetchWithTokenRefresh(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    const data = await response.json();
+    if (data.results && data.results.success) {
+      return { ...data, ...data.results };
+    }
+    return data;
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const manageFacultyAssignments = async (
+data: ManageFacultyAssignmentsRequest,
+method: "GET" | "POST" = "GET")
+: Promise<ManageFacultyAssignmentsResponse> => {
+  try {
+    if (!data.branch_id) throw new Error("Branch ID is required");
+    if (method === "POST" && !data.action) {
+      throw new Error("Action is required for POST requests");
+    }
+    if (data.action === "create" && (!data.faculty_id || !data.subject_id || !data.semester_id || !data.section_id)) {
+      throw new Error("Faculty ID, Subject ID, Semester ID, and Section ID are required for create action");
+    }
+    if (data.action === "update" && (!data.assignment_id || !data.faculty_id || !data.subject_id || !data.semester_id || !data.section_id)) {
+      throw new Error("Assignment ID, Faculty ID, Subject ID, Semester ID, and Section ID are required for update action");
+    }
+    if (data.action === "delete" && !data.assignment_id) {
+      throw new Error("Assignment ID is required for delete action");
+    }
+    let url = `${API_ENDPOINT}/hod/faculty-assignments/?branch_id=${data.branch_id}`;
+    if (method === "GET") {
+      const params = new URLSearchParams({ branch_id: data.branch_id });
+      if (data.semester_id) params.append("semester_id", data.semester_id);
+      if (data.section_id) params.append("section_id", data.section_id);
+      if ((data as any).page) params.append("page", (data as any).page.toString());
+      if ((data as any).search) params.append("search", (data as any).search);
+      url = `${API_ENDPOINT}/hod/faculty-assignments/?${params.toString()}`;
+    }
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: method === "POST" ? JSON.stringify(data) : undefined
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const manageTimetable = async (data: ManageTimetableRequest): Promise<ManageTimetableResponse> => {
+  try {
+    if (!data.branch_id) throw new Error("Branch ID is required");
+    if (data.action === "GET") {
+      const params = new URLSearchParams({ branch_id: data.branch_id });
+      if (data.semester_id) params.append("semester_id", data.semester_id);
+      if (data.section_id) params.append("section_id", data.section_id);
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/timetable/?${params.toString()}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+
+      });
+      return await response.json();
+    }
+
+    if ((data.action === "create" || data.action === "update") && (!data.semester_id || !data.section_id)) {
+      throw new Error("Semester ID and Section ID are required for create/update action");
+    }
+
+    const headers: HeadersInit = {};
+    let body: FormData | string;
+
+    if (data.action === "bulk_create") {
+      if (!data.semester_id || !data.section_id || !data.file) {
+        throw new Error("Semester ID, Section ID, and File are required for bulk_create action");
+      }
+      const formData = new FormData();
+      formData.append("action", data.action);
+      formData.append("branch_id", data.branch_id);
+      formData.append("semester_id", data.semester_id);
+      formData.append("section_id", data.section_id);
+      if (data.room) formData.append("room", data.room);
+      formData.append("file", data.file);
+      body = formData;
+    } else {
+      if (data.action === "create" || data.action === "update") {
+        if (!data.assignment_id || !data.day || !data.slot_id) {
+          throw new Error("Assignment ID, Day, and Slot are required for create/update action");
+        }
+      }
+      if (data.action === "delete" && !data.timetable_id) {
+        throw new Error("Timetable ID is required for delete action");
+      }
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(data);
+    }
+
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/timetable/`, {
+      method: "POST",
+      headers,
+      body
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const manageHODLeaves = async (
+data: ManageHODLeavesRequest,
+method: "GET" | "POST" = "GET")
+: Promise<ManageHODLeavesResponse> => {
+  try {
+    if (!data.branch_id) throw new Error("Branch ID is required");
+    const url = `${API_ENDPOINT}/hod/leave-applications/?branch_id=${data.branch_id}`;
+    if (method === "POST" && (!data.title || !data.start_date || !data.end_date || !data.reason)) {
+      throw new Error("Title, Start Date, End Date, and Reason are required for POST request");
+    }
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: method === "POST" ? JSON.stringify(data) : undefined
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const manageLeaves = async (
+data: ManageLeavesRequest,
+method: "GET" | "PATCH" = "GET")
+: Promise<ManageLeavesResponse> => {
+  try {
+    if (!data.branch_id) throw new Error("Branch ID is required");
+    const url = `${API_ENDPOINT}/hod/leaves/?branch_id=${data.branch_id}`;
+    if (method === "PATCH" && (!data.action || !data.leave_id || !data.status)) {
+      throw new Error("Action, Leave ID, and Status are required for PATCH request");
+    }
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: method === "PATCH" ? JSON.stringify(data) : undefined
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getAttendance = async (params: GetAttendanceParams): Promise<GetAttendanceResponse> => {
+  try {
+    if (!params.branch_id) throw new Error("Branch ID is required");
+    const query = new URLSearchParams(params as any).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/attendance/?${query}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    const dataRes = await response.json();
+    if (dataRes.results && dataRes.results.success) {
+      return { ...dataRes, ...dataRes.results };
+    }
+    return dataRes;
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getMarks = async (params: GetMarksParams): Promise<GetMarksResponse> => {
+  try {
+    if (!params.branch_id) throw new Error("Branch ID is required");
+    const query = new URLSearchParams(params as any).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/marks/?${query}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    const dataRes = await response.json();
+    if (dataRes.results && dataRes.results.success) {
+      return { ...dataRes, ...dataRes.results };
+    }
+    return dataRes;
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const createAnnouncement = async (data: CreateAnnouncementRequest): Promise<CreateAnnouncementResponse> => {
+  try {
+    if (!data.branch_id || !data.title || !data.content || !data.target) {
+      throw new Error("Branch ID, Title, Content, and Target are required");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/announcements/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const sendNotification = async (data: SendNotificationRequest): Promise<SendNotificationResponse> => {
+  try {
+    if (!data.branch_id || !data.title || !data.message) throw new Error("Branch ID, Title, and Message are required");
+    if (data.action === "notify" && !data.student_id) throw new Error("Student ID is required for notify action");
+    if (data.action === "notify_all" && !data.target) throw new Error("Target is required for notify_all action");
+    if (data.action === "notify_low_attendance" && !data.student_ids && (!data.semester_id || !data.section_id || !data.subject_id || !data.threshold)) {
+      throw new Error("Student IDs or (Semester ID, Section ID, Subject ID, and Threshold) are required for notify_low_attendance action");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/notifications/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getNotifications = async (branch_id: string): Promise<GetNotificationsResponse> => {
+  try {
+    if (!branch_id) throw new Error("Branch ID is required");
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/notifications/history/?branch_id=${branch_id}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getSentNotifications = async (branch_id: string): Promise<GetNotificationsResponse> => {
+  try {
+    if (!branch_id) throw new Error("Branch ID is required");
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/notifications/sent/?branch_id=${branch_id}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const assignProctor = async (data: AssignProctorRequest): Promise<AssignProctorResponse> => {
+  try {
+    if (!data.branch_id || !data.student_id || !data.faculty_id) {
+      throw new Error("Branch ID, Student ID, and Faculty ID are required");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/proctors/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const assignProctorsBulk = async (data: AssignProctorsBulkRequest): Promise<AssignProctorsBulkResponse> => {
+  try {
+    const hasUsns = Array.isArray((data as any).usns) && (data as any).usns.length > 0;
+    const hasStudentIds = Array.isArray((data as any).student_ids) && (data as any).student_ids.length > 0;
+    if (!data.branch_id || !(hasUsns || hasStudentIds) || !data.faculty_id) {
+      throw new Error("Branch ID, student IDs or USNs, and Faculty ID are required");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/proctors/bulk/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const manageChat = async (
+data: ManageChatRequest,
+method: "GET" | "POST" = "GET")
+: Promise<ManageChatResponse> => {
+  try {
+    if (!data.branch_id) throw new Error("Branch ID is required");
+    const url = `${API_ENDPOINT}/hod/chat/?branch_id=${data.branch_id}`;
+    if (method === "POST") {
+      if (!data.action) throw new Error("Action is required for POST requests");
+      if (data.action === "create_channel" && (!data.name || !data.channel_type)) {
+        throw new Error("Name and Channel Type are required for create_channel action");
+      }
+      if (data.action === "send_message" && (!data.channel_id || !data.content)) {
+        throw new Error("Channel ID and Content are required for send_message action");
+      }
+    }
+    const response = await fetchWithTokenRefresh(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: method === "POST" ? JSON.stringify(data) : undefined
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const manageProfile = async (
+data: ManageProfileRequest,
+method: "GET" | "PATCH" = "GET")
+: Promise<ManageProfileResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/profile/`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      // prevent conditional requests that result in 304 when we want fresh profile
+      cache: method === 'GET' ? 'no-store' : undefined,
+      body: method === "PATCH" ? JSON.stringify(data) : undefined
+    });
+
+    // If server returned 304 Not Modified, try to use cached profile from localStorage
+    if (response.status === 304) {
+      try {
+        const cached = sessionStorage.getItem("user");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          return { success: true, data: parsed } as ManageProfileResponse;
+        }
+        return { success: false, message: 'Profile not modified and no cached profile available' } as ManageProfileResponse;
+      } catch (e) {
+        return { success: false, message: 'Profile not modified and failed to read cache' } as ManageProfileResponse;
+      }
+    }
+
+    // For other responses, attempt to parse JSON and return
+    if (!response.ok) {
+      let parsed: any = null;
+      try {parsed = await response.json();} catch (e) {/* ignore */}
+      const message = parsed?.message || `Request failed (status: ${response.status})`;
+      return { success: false, message, data: parsed?.data } as ManageProfileResponse;
+    }
+
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getR2PresignedUrl = async (file_name: string, file_type: string): Promise<GetR2PresignedUrlResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/common/generate-r2-presigned-url/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_name, file_type })
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const uploadStudyMaterial = async (data: UploadStudyMaterialRequest): Promise<UploadStudyMaterialResponse> => {
+  try {
+    if (!data.branch_id || !data.semester_id || !data.title || !data.file_url) {
+      throw new Error("Branch ID, Semester ID, Title, and File URL are required");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/study-materials/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const deleteStudyMaterial = async (material_id: string): Promise<any> => {
+  try {
+    if (!material_id) throw new Error("Material ID is required");
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/study-materials/`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ material_id })
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getStudyMaterials = async (
+branch_id?: string,
+semester_id?: string,
+section_id?: string,
+search?: string,
+page?: number,
+page_size?: number)
+: Promise<GetStudyMaterialsResponse> => {
+  try {
+    const params = new URLSearchParams();
+    if (branch_id) params.append('branch_id', branch_id);
+    if (semester_id) params.append('semester_id', semester_id);
+    if (section_id) params.append('section_id', section_id);
+    if (search) params.append('search', search);
+    if (page) params.append('page', page.toString());
+    if (page_size) params.append('page_size', page_size.toString());
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/study-materials/${qs}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const dataRes = await response.json();
+    if (dataRes.results && dataRes.results.success) {
+      return { ...dataRes, ...dataRes.results };
+    }
+    return dataRes;
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const promoteStudentsToNextSemester = async (data: PromoteStudentsRequest): Promise<PromoteStudentsResponse> => {
+  try {
+    if (!data.branch_id || !data.from_semester_id) {
+      throw new Error("Branch ID and From Semester ID are required");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/promote-students/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const graduateStudents = async (data: { student_ids: string[] }): Promise<any> => {
+  try {
+    if (!data.student_ids?.length) {
+      throw new Error("Student IDs are required");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/graduate-students/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const promoteSelectedStudents = async (data: PromoteSelectedStudentsRequest): Promise<PromoteSelectedStudentsResponse> => {
+  try {
+    if (!data.branch_id || !data.student_ids?.length) {
+      throw new Error("Branch ID and non-empty Student IDs are required");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/promote-selected-students/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const demoteStudent = async (data: DemoteStudentRequest): Promise<DemoteStudentResponse> => {
+  try {
+    if (!data.branch_id || !data.student_id || !data.to_semester_id || !data.reason) {
+      throw new Error("Branch ID, Student ID, To Semester ID, and Reason are required");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/demote-student/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const bulkDemoteStudents = async (data: BulkDemoteStudentsRequest): Promise<BulkDemoteStudentsResponse> => {
+  try {
+    if (!data.branch_id || !data.student_ids?.length || !data.to_semester_id || !data.reason) {
+      throw new Error("Branch ID, non-empty Student IDs, To Semester ID, and Reason are required");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/demote-students/bulk/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getPromotionEligibility = async (params: GetPromotionEligibilityParams): Promise<GetPromotionEligibilityResponse> => {
+  try {
+    if (!params.branch_id || !params.semester_id) {
+      throw new Error("Branch ID and Semester ID are required");
+    }
+    const query = new URLSearchParams(params as any).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/promotion-eligibility/?${query}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getExamFailures = async (params: GetExamFailuresParams): Promise<GetExamFailuresResponse> => {
+  try {
+    if (!params.branch_id) throw new Error("Branch ID is required");
+    const query = new URLSearchParams(params as any).toString();
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/exam-failures/?${query}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const recordExamFailure = async (data: RecordExamFailureRequest): Promise<RecordExamFailureResponse> => {
+  try {
+    if (!data.branch_id || !data.student_id || !data.subject_id || !data.semester_id || !data.failure_date) {
+      throw new Error("Branch ID, Student ID, Subject ID, Semester ID, and Failure Date are required");
+    }
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/record-exam-failure/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+// New combined bootstrap endpoints
+export const getFacultyAssignmentsBootstrap = async (): Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    profile: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      branch: string;
+      branch_id: string;
+    };
+    semesters: Array<{id: string;number: number;}>;
+    faculties: Array<{id: string;username: string;first_name: string;last_name: string;}>;
+  };
+}> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/faculty-assignments-bootstrap/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getNotificationsBootstrap = async (): Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    profile: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      branch: string;
+      branch_id: string;
+    };
+    received_notifications: Array<{
+      id: string;
+      title: string;
+      message: string;
+      notification_type: string;
+      priority: string;
+      created_at: string;
+      read: boolean;
+    }>;
+    sent_notifications: Array<{
+      id: string;
+      title: string;
+      message: string;
+      notification_type: string;
+      priority: string;
+      created_at: string;
+      recipient_count: number;
+    }>;
+  };
+}> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/notifications-bootstrap/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+export const getPromotionBootstrap = async (): Promise<{
+  success: boolean;
+  message?: string;
+  data?: {
+    profile: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      branch: string;
+      branch_id: string;
+      total_semesters: number;
+    };
+    semesters: Array<{id: string;number: number;}>;
+    sections: Array<{id: string;name: string;semester_id: string | null;}>;
+  };
+}> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/promotion-bootstrap/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    return await response.json();
+  } catch (error: unknown) {
+    return handleApiError(error, (error as any).response);
+  }
+};
+
+// Faculty Attendance API functions for HOD
+export interface FacultyAttendanceTodayRecord {
+  id: string;
+  faculty_name: string;
+  faculty_id: string;
+  status: string;
+  marked_at: string | null;
+  notes: string | null;
+}
+export interface AttendanceLocation {
+  latitude?: number | null;
+  longitude?: number | null;
+  inside?: boolean | null;
+  distance_meters?: number | null;
+  campus_name?: string | null;
+}
+
+export interface GetFacultyAttendanceTodayResponse {
+  success: boolean;
+  message?: string;
+  data?: FacultyAttendanceTodayRecord[];
+  summary?: {
+    total_faculty: number;
+    present: number;
+    absent: number;
+    not_marked: number;
+  };
+  pagination?: {
+    page: number;
+    page_size: number;
+    total_pages: number;
+    total_items: number;
+    has_next: boolean;
+    has_prev: boolean;
+    next_page: number | null;
+    prev_page: number | null;
+  };
+}
+
+export interface FacultyAttendanceRecord {
+  id: string;
+  faculty_name: string;
+  faculty_id: string;
+  date: string;
+  status: string;
+  marked_at: string;
+  notes: string;
+  location?: AttendanceLocation | null;
+}
+
+export interface GetFacultyAttendanceRecordsResponse {
+  success: boolean;
+  message?: string;
+  data?: FacultyAttendanceRecord[];
+  faculty_summary?: Array<{
+    name: string;
+    total_days: number;
+    present_days: number;
+    absent_days: number;
+    attendance_percentage: number;
+  }>;
+  pagination?: {
+    page: number;
+    page_size: number;
+    total_pages: number;
+    total_items: number;
+    has_next: boolean;
+    has_prev: boolean;
+    next_page: number | null;
+    prev_page: number | null;
+  };
+}
+
+export const getFacultyAttendanceToday = async (params?: {
+  page?: number;
+  page_size?: number;
+}): Promise<GetFacultyAttendanceTodayResponse> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.page_size) queryParams.append("page_size", params.page_size.toString());
+
+    const url = `${API_ENDPOINT}/hod/faculty-attendance-today/${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+
+    const response = await fetchWithTokenRefresh(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`
+      }
+    });
+    return await response.json();
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getFacultyAttendanceRecords = async (params?: {
+  start_date?: string;
+  end_date?: string;
+  faculty_id?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<GetFacultyAttendanceRecordsResponse> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params?.start_date) queryParams.append("start_date", params.start_date);
+    if (params?.end_date) queryParams.append("end_date", params.end_date);
+    if (params?.faculty_id) queryParams.append("faculty_id", params.faculty_id);
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.page_size) queryParams.append("page_size", params.page_size.toString());
+
+    const url = `${API_ENDPOINT}/hod/faculty-attendance-records/${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+
+    const response = await fetchWithTokenRefresh(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`
+      }
+    });
+    return await response.json();
+  } catch (error) {
+
+    return { success: false, message: "Network error" };
+  }
+};
+
+export interface PromotionHistoryItem {
+  id: number;
+  usn: string;
+  name: string;
+  from_semester: number | null;
+  to_semester: number | null;
+  status: string;
+  processed_at: string | null;
+  remarks: string;
+}
+
+export interface GetPromotionHistoryResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    items: PromotionHistoryItem[];
+    total: number;
+    page: number;
+    pages: number;
+    has_next: boolean;
+    has_previous: boolean;
+  };
+}
+
+export const getPromotionHistory = async (params?: {
+  status?: string;
+  month?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<GetPromotionHistoryResponse> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append("status", params.status);
+    if (params?.month) queryParams.append("month", params.month);
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.page_size) queryParams.append("page_size", params.page_size.toString());
+
+    const url = `${API_ENDPOINT}/hod/promotion-history/${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+
+    const response = await fetchWithTokenRefresh(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export interface HodStudentLeave {
+  id: string;
+  student_name: string;
+  usn: string;
+  proctor_name?: string;
+  semester?: string;
+  section?: string;
+  start_date: string | null;
+  end_date: string | null;
+  reason: string;
+  status: "FORWARDED_TO_HOD" | "APPROVED" | "REJECTED" | string;
+  proctor_remarks?: string;
+  forwarded_at?: string | null;
+  forwarded_by?: string | null;
+  hod_remarks?: string;
+  hod_reviewed_at?: string | null;
+  hod_reviewed_by?: string | null;
+  submitted_at: string | null;
+  submitted_at_raw: string | null;
+}
+
+export interface GetHodStudentLeavesResponse {
+  success: boolean;
+  message?: string;
+  data?: HodStudentLeave[];
+  pending_count?: number;
+  pagination?: {
+    page: number;
+    page_size: number;
+    total_pages: number;
+    total_count: number;
+  };
+}
+
+export const getHodStudentLeaves = async (params?: {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  status?: string;
+  count_only?: boolean;
+}): Promise<GetHodStudentLeavesResponse> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.page_size) queryParams.append("page_size", params.page_size.toString());
+    if (params?.search) queryParams.append("search", params.search);
+    if (params?.status) queryParams.append("status", params.status);
+    if (params?.count_only) queryParams.append("count_only", "true");
+
+    const url = `${API_ENDPOINT}/hod/student-leaves/${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+
+    const response = await fetchWithTokenRefresh(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const manageHodStudentLeave = async (data: {
+  leave_id: string;
+  action: "APPROVE" | "REJECT";
+  remarks?: string;
+  rejection_reason?: string;
+}): Promise<{ success: boolean; message?: string }> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/manage-student-leave/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export interface HODAttendanceRecord {
+  id: number;
+  date: string;
+  subject: string | null;
+  subject_id: number | null;
+  subject_code: string | null;
+  subject_type: string;
+  section: string | null;
+  section_id: number | null;
+  semester: number | null;
+  semester_id: number | null;
+  branch?: string | null;
+  branch_id?: number | null;
+  batch?: string | null;
+  batch_id?: number | null;
+  faculty_id?: number | null;
+  faculty_name: string;
+  lab_batch_id?: number | null;
+  lab_batch_name?: string | null;
+  file_path: string | null;
+  status: string;
+  summary: {
+    present_count: number;
+    absent_count: number;
+    total_count: number;
+    present_percentage: number;
+  };
+}
+
+export interface GetHODAttendanceRecordsResponse {
+  success: boolean;
+  message?: string;
+  data?: HODAttendanceRecord[];
+  count?: number;
+  total_pages?: number;
+  current_page?: number;
+  meta?: {
+    total_records?: number;
+  };
+}
+
+export interface HODAttendanceRecordDetailsResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    id: number;
+    date: string;
+    subject: string | null;
+    subject_code: string | null;
+    subject_type: string;
+    section: string | null;
+    semester: number | null;
+    branch: string | null;
+    batch_name?: string | null;
+    batch_id?: number | null;
+    faculty_name: string;
+    lab_batch_name?: string | null;
+    present: Array<{
+      id: number;
+      name: string;
+      usn: string;
+      status?: boolean;
+      subject_percentage?: number;
+      subject_present?: number;
+      subject_total?: number;
+      subject_absent?: number;
+    }>;
+    absent: Array<{
+      id: number;
+      name: string;
+      usn: string;
+      status?: boolean;
+      subject_percentage?: number;
+      subject_present?: number;
+      subject_total?: number;
+      subject_absent?: number;
+    }>;
+    present_count: number;
+    absent_count: number;
+    total_count: number;
+    present_percentage: number;
+  };
+}
+
+export interface HODAttendanceFiltersResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    branch: { id: number; name: string };
+    batches?: Array<{ id: number | string; name: string; start_year?: number; end_year?: number }>;
+    semesters: Array<{ id: number | string; number: number }>;
+    sections: Array<{ id: number | string; name: string; semester_id: number | string }>;
+    subjects: Array<{ id: number | string; name: string; subject_code: string; subject_type: string; semester_id: number | string }>;
+    overall?: {
+      total_sessions: number;
+      total_present: number;
+      total_absent: number;
+      avg_attendance: number;
+    };
+    batch_stats?: Array<{
+      batch_id: string;
+      batch_name: string;
+      sessions: number;
+      present: number;
+      absent: number;
+      attendance_percentage: number;
+    }>;
+    semester_stats?: Array<{
+      semester_id: string;
+      semester_number: number;
+      sessions: number;
+      present: number;
+      absent: number;
+      attendance_percentage: number;
+    }>;
+  };
+}
+
+export const getHODAttendanceRecordsWithSummary = async (params?: {
+  page?: number;
+  page_size?: number;
+  batch_id?: string;
+  semester_id?: string;
+  section_id?: string;
+  subject_id?: string;
+  lab_batch_id?: string;
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+}): Promise<GetHODAttendanceRecordsResponse> => {
+  try {
+    const query = new URLSearchParams();
+    if (params?.page) query.append("page", String(params.page));
+    if (params?.page_size) query.append("page_size", String(params.page_size));
+    if (params?.batch_id) query.append("batch_id", params.batch_id);
+    if (params?.semester_id) query.append("semester_id", params.semester_id);
+    if (params?.section_id) query.append("section_id", params.section_id);
+    if (params?.subject_id) query.append("subject_id", params.subject_id);
+    if (params?.lab_batch_id) query.append("lab_batch_id", params.lab_batch_id);
+    if (params?.date) query.append("date", params.date);
+    if (params?.start_date) query.append("start_date", params.start_date);
+    if (params?.end_date) query.append("end_date", params.end_date);
+    if (params?.search) query.append("search", params.search);
+
+    const qs = query.toString() ? `?${query.toString()}` : "";
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/attendance-records/${qs}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getHODAttendanceRecordDetails = async (
+  recordId: number | string,
+  startDate?: string,
+  endDate?: string
+): Promise<HODAttendanceRecordDetailsResponse> => {
+  try {
+    const params = new URLSearchParams();
+    if (startDate) params.append("start_date", startDate);
+    if (endDate) params.append("end_date", endDate);
+    const queryString = params.toString() ? `?${params.toString()}` : "";
+
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/attendance-records/${recordId}/details/${queryString}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export const getHODAttendanceFilters = async (): Promise<HODAttendanceFiltersResponse> => {
+  try {
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/attendance-records/filters/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+
+export interface SubjectMeta {
+  id: string | number;
+  name: string;
+  code: string;
+  full_name: string;
+}
+
+export interface FacultyAttendanceInfo {
+  assigned_faculty: string[];
+  assigned_faculty_name: string;
+  marked_by_faculty: string[];
+  marked_by_faculty_name: string;
+  subject_name?: string | null;
+  subject_code?: string | null;
+  subject_type?: string | null;
+  all_subjects?: SubjectMeta[];
+}
+
+export interface AttendanceSessionItem {
+  id: number;
+  record_id?: number;
+  date: string;
+  formatted_date?: string;
+  day_of_week?: string;
+  section?: string;
+  faculty_name?: string;
+  present_count?: number;
+  absent_count?: number;
+}
+
+export interface SubjectAttendanceItem {
+  subject_id: number;
+  subject_name: string;
+  subject_code?: string;
+  short_name?: string;
+  full_name?: string;
+  conducted_classes: number;
+  attended_classes: number;
+  absent_classes: number;
+  attendance_percentage: number;
+  status: "Eligible" | "Warning" | "Shortage" | "No Classes";
+}
+
+export interface StudentAttendanceSummaryItem {
+  id: number | string;
+  name: string;
+  usn: string;
+  batch?: string;
+  section?: string;
+  semester?: number | string;
+  branch?: string;
+  subject?: string;
+  subject_name?: string;
+  subject_code?: string;
+  conducted_classes: number;
+  attended_classes: number;
+  absent_classes: number;
+  attendance_percentage: number;
+  status: "Eligible" | "Warning" | "Shortage" | "No Classes";
+  session_status?: Record<number | string, "present" | "absent">;
+  subject_breakdown?: SubjectAttendanceItem[];
+}
+
+export interface StudentAttendanceSummaryResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    students: StudentAttendanceSummaryItem[];
+    sessions?: AttendanceSessionItem[];
+    faculty_info?: FacultyAttendanceInfo;
+    summary: {
+      total_students: number;
+      total_sessions: number;
+      avg_attendance: number;
+      eligible_count: number;
+      shortage_count: number;
+      start_date?: string;
+      end_date?: string;
+    };
+  };
+}
+
+export const getHODStudentAttendanceSummary = async (params: {
+  semester_id: string;
+  section_id: string;
+  batch_id?: string;
+  subject_id?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+}): Promise<StudentAttendanceSummaryResponse> => {
+  try {
+    const query = new URLSearchParams();
+    query.append("semester_id", params.semester_id);
+    query.append("section_id", params.section_id);
+    if (params.batch_id && params.batch_id !== "all") query.append("batch_id", params.batch_id);
+    if (params.subject_id && params.subject_id !== "all") query.append("subject_id", params.subject_id);
+    if (params.start_date) query.append("start_date", params.start_date);
+    if (params.end_date) query.append("end_date", params.end_date);
+    if (params.search) query.append("search", params.search);
+
+    const qs = query.toString() ? `?${query.toString()}` : "";
+    const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/attendance-records/student-summary/${qs}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        "Content-Type": "application/json"
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+};
+

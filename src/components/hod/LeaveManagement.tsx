@@ -1,0 +1,1042 @@
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CheckCircle, XCircle, Filter, FileText, ExternalLink } from "lucide-react";
+import { SkeletonTable, SkeletonCard } from "../ui/skeleton";
+import Swal from 'sweetalert2';
+import { manageLeaves, manageProfile, getFacultyLeavesBootstrap, getHodStudentLeaves } from "../../utils/hod_api";
+import { useTheme } from "../../context/ThemeContext";
+import { DepartmentStudentLeaves } from "./DepartmentStudentLeaves";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from
+  "@/components/ui/select";
+
+interface LeaveRequest {
+  id: string;
+  name: string;
+  role: string;
+  dept: string;
+  title: string;
+  leave_type: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  is_half_day?: boolean;
+  half_day_session?: string | null;
+  from: string;
+  to: string;
+  period: string;
+  reason: string;
+  status: "Pending" | "Approved" | "Rejected" | "Endorsed (Pending Principal)" | "Endorsed (Pending Dean)" | "Endorsed (Pending COE)" | "Endorsed (Pending Next Authority)" | string;
+  initial_document_url?: string | null;
+  completion_document_url?: string | null;
+  od_completion_verified?: boolean;
+  od_purpose_category?: string | null;
+  alternate_faculty_name?: string | null;
+  alternate_duty_status?: string;
+  hod_approval_status?: string;
+  hod_reviewed_by_name?: string | null;
+  current_stage?: string;
+  canApprove?: boolean;
+}
+
+interface FacultyLeaveData {
+  id: number;
+  title?: string;
+  faculty_name: string;
+  role?: string;
+  department: string;
+  leave_type?: string;
+  initial_document_url?: string | null;
+  completion_document_url?: string | null;
+  od_completion_verified?: boolean;
+  od_purpose_category?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  is_half_day?: boolean;
+  half_day_session?: string | null;
+  start_date: string;
+  end_date: string;
+  reason: string;
+  status: string;
+  current_stage?: string;
+  alternate_faculty_name?: string | null;
+  alternate_duty_status?: string;
+  hod_approval_status?: string;
+  hod_reviewed_by_name?: string | null;
+  intermediate_approval_status?: string;
+  principal_approval_status?: string;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+}
+
+interface ProfileData {
+  branch_id: string;
+}
+
+interface FacultyLeavesBootstrapResponse {
+  profile: ProfileData;
+  leaves: FacultyLeaveData[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+}
+
+const LeaveManagement = () => {
+  const [activeTab, setActiveTab] = useState<"faculty" | "student">("faculty");
+  const [studentPendingCount, setStudentPendingCount] = useState<number>(0);
+  const [search, setSearch] = useState("");
+  const [localSearch, setLocalSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
+  const [showFilter, setShowFilter] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setShowFilter(false);
+      }
+    };
+
+    if (showFilter) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFilter]);
+
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [branchId, setBranchId] = useState("");
+  const [viewReason, setViewReason] = useState<string | null>(null);
+  const { theme } = useTheme();
+  const hasFetchedRef = useRef(false);
+  const initialLoadRef = useRef(true);
+  const isSilentOperationRef = useRef(false);
+
+  const pendingFacultyLeavesCount = leaveRequests.filter(r => r.status === "Pending" || r.canApprove).length;
+
+  useEffect(() => {
+    const fetchStudentPendingCount = async () => {
+      try {
+        const res = await getHodStudentLeaves({ status: 'FORWARDED_TO_HOD', count_only: true });
+        if (res && res.pending_count !== undefined) {
+          setStudentPendingCount(Number(res.pending_count));
+        } else if (res && res.pagination?.total_count !== undefined) {
+          setStudentPendingCount(Number(res.pagination.total_count));
+        }
+      } catch (err) {
+        console.error("Error fetching student pending count:", err);
+      }
+    };
+    fetchStudentPendingCount();
+    window.addEventListener('leaves-updated', fetchStudentPendingCount);
+    return () => {
+      window.removeEventListener('leaves-updated', fetchStudentPendingCount);
+    };
+  }, []);
+
+  // Format date range to "MMM DD, YYYY to MMM DD, YYYY" (or single date if same day)
+  const formatPeriod = (startDate: string, endDate: string): string => {
+    try {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const options: Intl.DateTimeFormatOptions = { month: "short", day: "2-digit", year: "numeric" };
+      const startStr = start.toLocaleDateString("en-US", options);
+      const endStr = end.toLocaleDateString("en-US", options);
+      if (startDate === endDate || startStr === endStr) {
+        return startStr;
+      }
+      return `${startStr} to ${endStr}`;
+    } catch {
+      return "Invalid date";
+    }
+  };
+
+  const renderLeaveCategoryBadge = (leaveType: string, isHalfDay?: boolean, halfDaySession?: string | null, odCategory?: string | null) => {
+    const normalizedType = (leaveType || 'casual').toLowerCase();
+    
+    let label = 'Casual (CL)';
+    let colorClass = 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300';
+    
+    if (normalizedType === 'od' || normalizedType === 'on_duty') {
+      label = 'On Duty (OD)';
+      colorClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300';
+    } else if (normalizedType === 'short_permission') {
+      label = 'Short Permission';
+      colorClass = 'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300';
+    } else if (normalizedType === 'earned' || normalizedType === 'el') {
+      label = 'Earned (EL)';
+      colorClass = 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300';
+    } else if (normalizedType === 'vacation') {
+      label = 'Vacation Leave';
+      colorClass = 'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300';
+    } else if (normalizedType === 'rh' || normalizedType === 'restricted_holiday') {
+      label = 'Holiday (RH)';
+      colorClass = 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300';
+    } else if (normalizedType === 'maternity' || normalizedType === 'ml') {
+      label = 'Maternity (ML)';
+      colorClass = 'bg-pink-100 text-pink-800 dark:bg-pink-950/40 dark:text-pink-300';
+    }
+
+    const showHalfDay = Boolean(isHalfDay || normalizedType === 'half_day');
+    const sessionNormalized = (halfDaySession || '').toLowerCase();
+    const sessionText = (sessionNormalized === 'forenoon' || sessionNormalized === 'morning') ? 'Morning' : 'Afternoon';
+
+    return (
+      <div className="flex flex-wrap items-center gap-1 mt-1">
+        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.2 rounded w-fit ${colorClass}`}>
+          {label}
+        </span>
+        {odCategory && (
+          <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 w-fit">
+            OD: {odCategory.replace(/_/g, ' ').toUpperCase()}
+          </span>
+        )}
+        {showHalfDay && (
+          <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 w-fit">
+            Half-Day ({sessionText})
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  // Fetch branch_id from manageProfile
+  const fetchBranchId = async () => {
+    try {
+      const profileRes = await manageProfile({}, "GET");
+      if (profileRes.success && profileRes.data?.branch_id) {
+        setBranchId(profileRes.data.branch_id);
+      } else {
+        setErrors(["Failed to fetch branch ID: No branch assigned"]);
+      }
+    } catch (err) {
+
+      setErrors(["Failed to connect to backend for branch ID"]);
+    }
+  };
+
+  // Fetch leave requests
+  const fetchLeaveRequests = async (page: number = 1) => {
+    setIsLoading(true);
+    try {
+      const filters = {
+        status: filterStatus !== "All" ?
+          filterStatus === "Pending" ? "PENDING" :
+            filterStatus === "Approved" ? "APPROVED" :
+              filterStatus === "Rejected" ? "REJECTED" : undefined : undefined,
+        search: search || undefined,
+        date_from: dateFrom ? `${dateFrom}T00:00:00Z` : undefined,
+        date_to: dateTo ? `${dateTo}T23:59:59Z` : undefined,
+        page,
+        page_size: 50 // Match backend AdminPagination default
+      };
+
+      const response = await getFacultyLeavesBootstrap(undefined, filters); // No branch_id needed
+      if (!response.results || !response.results.success || !response.results.data) {
+        throw new Error(response.results?.message || response.message || "Failed to fetch data");
+      }
+
+      const data: FacultyLeavesBootstrapResponse = response.results.data;
+
+      // Set branchId from response
+      setBranchId(data.profile.branch_id);
+
+      // Set leave requests
+      // Client-side safety filtering according to FINAL RULE:
+      const today = new Date();
+      const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const sevenDaysAgo = new Date(todayDateOnly);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const processed = data.leaves.
+        map((req: any) => {
+          const isPending = req.status === "PENDING";
+          const isHodApproved = req.hod_approval_status === "APPROVED";
+          const isAtHod = req.current_stage === "hod";
+
+          let displayStatus: "Pending" | "Approved" | "Rejected" | "Endorsed (Pending Principal)" | "Endorsed (Pending Next Authority)" = "Pending";
+          if (req.status === "APPROVED") {
+            displayStatus = "Approved";
+          } else if (req.status === "REJECTED") {
+            displayStatus = "Rejected";
+          } else if (isHodApproved) {
+            const nextStage = (req.current_stage || '').toLowerCase();
+            if (nextStage === 'principal') {
+              displayStatus = "Endorsed (Pending Principal)";
+            } else if (nextStage === 'dean') {
+              displayStatus = "Endorsed (Pending Dean)" as any;
+            } else if (nextStage === 'coe') {
+              displayStatus = "Endorsed (Pending COE)" as any;
+            } else if (nextStage && nextStage !== 'completed') {
+              displayStatus = `Endorsed (Pending ${nextStage.replace('_', ' ').toUpperCase()})` as any;
+            } else {
+              displayStatus = "Endorsed (Pending Next Authority)";
+            }
+          } else {
+            displayStatus = "Pending";
+          }
+
+          return {
+            raw: req,
+            mapped: {
+              id: req.id.toString(),
+              name: req.faculty_name || "Unknown",
+              role: req.role || "teacher",
+              dept: req.department || "Unknown",
+              title: req.title || (req.leave_type === 'short_permission' ? 'Short Permission' : (req.reason ? req.reason.slice(0, 50) : 'Leave Request')),
+              leave_type: req.leave_type || "casual",
+              start_time: req.start_time,
+              end_time: req.end_time,
+              is_half_day: Boolean(req.is_half_day || req.leave_type === 'half_day'),
+              half_day_session: req.half_day_session,
+              from: req.start_date || "N/A",
+              to: req.end_date || "N/A",
+              period: formatPeriod(req.start_date, req.end_date),
+              reason: req.reason || "No reason provided",
+              status: displayStatus,
+              initial_document_url: req.initial_document_url || null,
+              completion_document_url: req.completion_document_url || null,
+              od_completion_verified: Boolean(req.od_completion_verified),
+              od_purpose_category: req.od_purpose_category || null,
+              alternate_faculty_name: req.alternate_faculty_name,
+              alternate_duty_status: req.alternate_duty_status,
+              hod_approval_status: req.hod_approval_status,
+              hod_reviewed_by_name: req.hod_reviewed_by_name,
+              current_stage: req.current_stage,
+              canApprove: isPending && isAtHod && !isHodApproved
+            }
+          };
+        }).
+        filter((item) => {
+          const r = item.raw;
+          const status = (r.status || '').toUpperCase();
+          const isHodApproved = r.hod_approval_status === "APPROVED";
+
+          // If user has chosen a specific date range (e.g. via Month filter), skip the "7-day/pending active" rule
+          if (filters?.date_from || filters?.date_to) return true;
+
+          if (status === 'PENDING') {
+            if (isHodApproved) {
+              const refDateStr = r.reviewed_at || r.submitted_at;
+              if (!refDateStr) return true;
+              const ref = new Date(refDateStr);
+              const refDateOnly = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+              return refDateOnly >= sevenDaysAgo;
+            }
+            try {
+              const end = new Date(r.end_date);
+              const endDateOnly = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+              return endDateOnly >= todayDateOnly; // show only active/future pending
+            } catch {
+              return false;
+            }
+          }
+
+          if (status === 'APPROVED' || status === 'REJECTED') {
+            // Use reviewed_at if available else submitted_at
+            const refDateStr = r.reviewed_at || r.submitted_at;
+            if (!refDateStr) return false;
+            const ref = new Date(refDateStr);
+            const refDateOnly = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+            return refDateOnly >= sevenDaysAgo; // only recent approvals/rejections
+          }
+
+          return false;
+        }).
+        map((item) => item.mapped);
+
+      setLeaveRequests(processed);
+      setTotalCount(response.count || 0);
+      setTotalPages(response.total_pages || Math.ceil((response.count || 0) / 50));
+      setCurrentPage(response.current_page || page);
+      setErrors([]);
+
+      // Sync badge count to sidebar
+      const currentPendingCount = typeof (data as any).pending_count === 'number'
+        ? (data as any).pending_count
+        : (typeof response.pending_count === 'number' ? response.pending_count : processed.filter((l: any) => l.canApprove).length);
+      window.dispatchEvent(new CustomEvent('leave-approvals-updated', { detail: { pending_count: currentPendingCount } }));
+
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch data";
+
+      setErrors([errorMessage]);
+      setLeaveRequests([]);
+    } finally {
+      setIsLoading(false);
+      isSilentOperationRef.current = false;
+    }
+  };
+
+  // Handle approve
+  const handleApprove = async (index: number) => {
+    const leave = leaveRequests[index];
+    const isShortPermission = leave.leave_type === 'short_permission';
+    const typeLabel = isShortPermission ? 'Short Permission' : 'Leave';
+
+    const payload = {
+      action: "update" as const,
+      branch_id: branchId,
+      leave_id: leave.id,
+      status: "APPROVED" as const
+    };
+
+    const result = await Swal.fire({
+      title: `Approve ${typeLabel}?`,
+      text: `You are about to approve this ${typeLabel.toLowerCase()} request. Are you sure you want to proceed?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: `Yes, approve ${typeLabel.toLowerCase()}`,
+      cancelButtonText: 'No, cancel',
+      customClass: {
+        confirmButton: 'bg-green-600 text-white',
+        cancelButton: 'bg-gray-300 text-black'
+      }
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const res = await manageLeaves(payload, "PATCH");
+      if (res.success) {
+        setErrors([]);
+        const updated = res.updated_leave;
+        let newStatus: any = 'Approved';
+        if (updated && updated.status === 'PENDING' && updated.hod_approval_status === 'APPROVED') {
+          const nextStage = (updated.current_stage || '').toLowerCase();
+          if (nextStage === 'principal') {
+            newStatus = "Endorsed (Pending Principal)";
+          } else if (nextStage === 'dean') {
+            newStatus = "Endorsed (Pending Dean)";
+          } else if (nextStage === 'coe') {
+            newStatus = "Endorsed (Pending COE)";
+          } else if (nextStage && nextStage !== 'completed') {
+            newStatus = `Endorsed (Pending ${nextStage.replace('_', ' ').toUpperCase()})`;
+          } else {
+            newStatus = "Endorsed (Pending Next Authority)";
+          }
+        }
+        // Update local list and sync count
+        setLeaveRequests((prev) => {
+          const nextList = prev.map((item) => item.id === leave.id ? { ...item, status: newStatus, canApprove: false } : item);
+          const remainingPending = typeof res.pending_leaves_count === 'number'
+            ? res.pending_leaves_count
+            : nextList.filter(item => item.canApprove).length;
+          window.dispatchEvent(new CustomEvent('leave-approvals-updated', { detail: { pending_count: remainingPending } }));
+          window.dispatchEvent(new CustomEvent('leaves-updated'));
+          return nextList;
+        });
+        Swal.fire(`${typeLabel} Approved!`, `The ${typeLabel.toLowerCase()} request has been approved.`, 'success');
+      } else {
+        setErrors([res.message || `Failed to approve ${typeLabel.toLowerCase()}`]);
+        Swal.fire('Error!', res.message || `Failed to approve the ${typeLabel.toLowerCase()} request.`, 'error');
+      }
+    } catch (err) {
+
+      setErrors([`Failed to approve ${typeLabel.toLowerCase()}`]);
+      Swal.fire('Error!', `Failed to approve the ${typeLabel.toLowerCase()} request.`, 'error');
+    }
+  };
+
+  // Handle reject
+  const handleReject = async (index: number) => {
+    const leave = leaveRequests[index];
+    const isShortPermission = leave.leave_type === 'short_permission';
+    const typeLabel = isShortPermission ? 'Short Permission' : 'Leave';
+
+    const payload = {
+      action: "update" as const,
+      branch_id: branchId,
+      leave_id: leave.id,
+      status: "REJECTED" as const
+    };
+    
+    Swal.fire({
+      title: `Reject ${typeLabel}?`,
+      text: `You are about to reject this ${typeLabel.toLowerCase()} request. Are you sure you want to proceed?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: `Yes, reject ${typeLabel.toLowerCase()}`,
+      cancelButtonText: 'No, cancel',
+      customClass: {
+        confirmButton: 'bg-red-600 text-white',
+        cancelButton: 'bg-gray-300 text-black'
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const res = await manageLeaves(payload, "PATCH");
+          if (res.success) {
+            setErrors([]);
+            // Update local list and sync count
+            setLeaveRequests((prev) => {
+              const nextList = prev.map((item) => item.id === leave.id ? { ...item, status: 'Rejected', canApprove: false } : item);
+              const remainingPending = typeof res.pending_leaves_count === 'number'
+                ? res.pending_leaves_count
+                : nextList.filter(item => item.canApprove).length;
+              window.dispatchEvent(new CustomEvent('leave-approvals-updated', { detail: { pending_count: remainingPending } }));
+              window.dispatchEvent(new CustomEvent('leaves-updated'));
+              return nextList;
+            });
+            Swal.fire('Rejected!', 'The leave request has been rejected.', 'success');
+          } else {
+            setErrors([res.message || "Failed to reject leave"]);
+            Swal.fire('Error!', res.message || 'Failed to reject the leave request.', 'error');
+          }
+        } catch (err) {
+
+          setErrors(["Failed to reject leave"]);
+          Swal.fire('Error!', 'Failed to reject the leave request.', 'error');
+        }
+      }
+    });
+  };
+
+  // Handle search changes - real-time search (only after initial load)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setSearch(localSearch);
+    }, 500); // Increased debounce to 500ms
+
+    return () => clearTimeout(timeoutId);
+  }, [localSearch]);
+
+  useEffect(() => {
+    if (initialLoadRef.current) return; // Don't search on initial load
+
+    isSilentOperationRef.current = true;
+    setCurrentPage(1);
+    fetchLeaveRequests(1);
+  }, [search]);
+
+  // Combined effect for initial load and filter changes
+  useEffect(() => {
+    const performFetch = async () => {
+      if (initialLoadRef.current) {
+        // Handle initial mount
+        if (hasFetchedRef.current) return;
+        hasFetchedRef.current = true;
+        await fetchLeaveRequests(1);
+        initialLoadRef.current = false;
+      } else {
+        // Handle subsequent filter changes
+        setCurrentPage(1);
+        fetchLeaveRequests(1);
+      }
+    };
+
+    performFetch();
+  }, [filterStatus, dateFrom, dateTo]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    fetchLeaveRequests(page);
+  };
+
+  return (
+    <div id="hod-leave-management-container" className={`min-h-screen ${theme === 'dark' ? 'bg-background text-foreground' : 'bg-gray-50 text-gray-900'}`}>
+      <Card className={`${theme === 'dark' ? 'bg-card border border-border' : 'bg-white border border-gray-200'}`}>
+        <div id="hod-leave-approvals-header-section">
+          <CardHeader className="border-b pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className={`text-xl sm:text-2xl font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Leave Approvals</CardTitle>
+                <CardDescription className="text-sm text-muted-foreground mt-1">Review and manage department faculty and student leave requests.</CardDescription>
+              </div>
+              <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-xl border border-border w-full sm:w-auto shrink-0 mt-1 sm:mt-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("faculty")}
+                  className={`flex-1 sm:flex-initial justify-center px-3.5 py-2 sm:py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${activeTab === "faculty"
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Faculty Leaves
+                  {pendingFacultyLeavesCount > 0 && (
+                    <span className={`px-1.5 py-0.2 rounded-full text-[11px] ${activeTab === "faculty" ? "bg-white text-primary font-bold" : "bg-primary text-white"}`}>
+                      {pendingFacultyLeavesCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("student")}
+                  className={`flex-1 sm:flex-initial justify-center px-3.5 py-2 sm:py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${activeTab === "student"
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Student Leaves
+                  {studentPendingCount > 0 && (
+                    <span className={`px-1.5 py-0.2 rounded-full text-[11px] ${activeTab === "student" ? "bg-white text-primary font-bold" : "bg-purple-600 text-white"}`}>
+                      {studentPendingCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </CardHeader>
+          {activeTab === "faculty" ? (
+            <CardContent className="p-2 sm:p-4">
+              {/* Search Bar */}
+              <div className="flex flex-row items-center gap-2 mb-6 w-full">
+                <Input
+                  placeholder="Search faculty..."
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  className={`flex-1 text-sm ${theme === 'dark' ? 'bg-card border-border text-foreground placeholder:text-muted-foreground' : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500'}`} />
+
+                <div className="relative shrink-0" ref={filterRef}>
+                  <Button
+                    onClick={() => setShowFilter(!showFilter)}
+                    className="h-10 text-sm font-medium flex items-center justify-center gap-1.5 shadow-sm transition-all duration-200 bg-primary text-white hover:bg-primary/90 px-3 sm:px-4">
+                    <Filter className="w-4 h-4" />
+                    <span className="hidden sm:inline">{filterStatus === "All" ? "Filter" : filterStatus}</span>
+                  </Button>
+                  {showFilter &&
+                    <div className={`absolute right-0 mt-2 w-48 ${theme === 'dark' ? 'bg-card border-border' : 'bg-white border-gray-200'} border rounded-md shadow-lg z-20`}>
+                      <div className="py-1">
+                        {(["All", "Pending", "Approved", "Rejected"] as const).map((status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            className={`block w-full text-left px-4 py-2 text-sm hover:${theme === 'dark' ? 'bg-accent' : 'bg-gray-100'} ${filterStatus === status ? (theme === 'dark' ? 'bg-accent text-accent-foreground' : 'bg-gray-100 text-gray-900') : (theme === 'dark' ? 'text-foreground' : 'text-gray-700')}`}
+                            onClick={() => {
+                              setFilterStatus(status);
+                              setShowFilter(false);
+                            }}>
+                          {status === "All" ? "All Status" : status}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            </CardContent>
+          ) : null}
+        </div>
+        {activeTab === "faculty" ? (
+          <CardContent >
+            {/* Errors */}
+            {errors.length > 0 &&
+              <div className={`mb-4 p-3 rounded-md ${theme === 'dark' ? 'bg-red-900/30 border border-red-700' : 'bg-red-50 border border-red-200'}`}>
+                <ul className={`text-sm list-disc list-inside ${theme === 'dark' ? 'text-red-300' : 'text-red-700'}`}>
+                  {errors.map((err, idx) =>
+                    <li key={idx}>{err}</li>
+                  )}
+                </ul>
+              </div>
+            }
+
+            {/* Mobile: Stacked Cards View */}
+            <div className="md:hidden space-y-3">
+              {isLoading ?
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) =>
+                    <SkeletonCard key={i} className="h-[200px]" />
+                  )}
+                </div> :
+                leaveRequests.length === 0 ?
+                  <div className={`border-2 border-dashed flex flex-col items-center justify-center p-8 text-center space-y-4 rounded-lg ${theme === 'dark' ? 'border-border bg-accent/5' : 'border-gray-200 bg-gray-50/50'}`}>
+                    <div className={`p-3 rounded-full ${theme === 'dark' ? 'bg-accent/10' : 'bg-primary/10'}`}>
+                      <Filter className={`w-8 h-8 ${theme === 'dark' ? 'text-primary/70' : 'text-primary/70'}`} />
+                    </div>
+                    <div className="max-w-xs mx-auto">
+                      <h3 className={`text-md font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+                        No Leave Requests Found
+                      </h3>
+                      <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+                        There are no leave requests matching the selected status or filters.
+                      </p>
+                    </div>
+                  </div> :
+                  leaveRequests.map((row) => (
+                    <div key={row.id} className={`p-3 sm:p-4 rounded-md border ${theme === 'dark' ? 'bg-card border-border text-foreground' : 'bg-white border-gray-200 text-gray-900'}`}>
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div>
+                          <div className="font-medium text-base">{row.name}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-muted text-muted-foreground">
+                              {row.role?.replace('_', ' ')}
+                            </span>
+                            {row.dept && row.dept !== 'N/A' && (
+                              <span className={`text-xs ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>{row.dept}</span>
+                            )}
+                          </div>
+                        </div>
+                      <div className="shrink-0">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${row.status === "Pending" ?
+                            theme === 'dark' ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-800' :
+                            row.status === "Approved" ?
+                              theme === 'dark' ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700' :
+                              row.status.startsWith("Endorsed") ?
+                                theme === 'dark' ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700' :
+                                theme === 'dark' ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-700'}`
+                          }>
+                          {row.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="my-2 p-2 rounded bg-accent/10 border border-border/40">
+                      <div className="font-semibold text-xs text-foreground">{row.title}</div>
+                      {renderLeaveCategoryBadge(row.leave_type, row.is_half_day, row.half_day_session, row.od_purpose_category)}
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {row.period}
+                        {row.start_time && row.end_time && (
+                          <span className="font-semibold text-purple-600 dark:text-purple-400 ml-1">
+                            ({row.start_time} - {row.end_time})
+                          </span>
+                        )}
+                      </div>
+                      {row.alternate_faculty_name && (
+                        <div className="text-[11px] text-muted-foreground mt-1">
+                          Sub: <span className="font-medium text-foreground">{row.alternate_faculty_name}</span> ({row.alternate_duty_status})
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-2 mb-4">
+                      <button
+                        onClick={() => setViewReason(row.reason)}
+                        className={`w-full h-9 text-sm font-semibold flex items-center justify-center rounded-lg shadow-sm transition-all duration-200
+                        ${theme === 'dark' ?
+                            'bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20' :
+                            'bg-primary/5 text-primary border border-primary/20 hover:bg-primary/10'}`
+                        }>
+                        View Reason
+                      </button>
+
+                      {(row.initial_document_url || row.completion_document_url) && (
+                        <>
+                          {row.initial_document_url && (
+                            <a
+                              href={row.initial_document_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`w-full h-9 text-xs font-semibold flex items-center justify-center gap-1.5 rounded-lg border shadow-sm transition-all ${
+                                theme === 'dark'
+                                  ? 'border-sky-500/30 bg-sky-950/30 text-sky-300 hover:bg-sky-950/50'
+                                  : 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100'
+                              }`}
+                            >
+                              <FileText className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                              <span>View Attachment</span>
+                              <ExternalLink className="w-3 h-3 opacity-70" />
+                            </a>
+                          )}
+                          {row.completion_document_url && (
+                            <a
+                              href={row.completion_document_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`w-full h-9 text-xs font-semibold flex items-center justify-center gap-1.5 rounded-lg border shadow-sm transition-all ${
+                                theme === 'dark'
+                                  ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-950/50'
+                                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              }`}
+                            >
+                              <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                              <span>View Attendance Certificate</span>
+                              <ExternalLink className="w-3 h-3 opacity-70" />
+                            </a>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {row.canApprove ?
+                      <div className="flex flex-row gap-2 mt-4">
+                        <Button
+                          variant="outline"
+                          className={`flex-1 h-9 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-all duration-200
+                          ${theme === 'dark' ?
+                              'text-green-400 border-green-400/50 bg-green-400/5 hover:bg-green-400/20' :
+                              'text-green-700 border-green-200 bg-green-50 hover:bg-green-100'}`
+                          }
+                          onClick={() => handleApprove(index)}
+                          disabled={isLoading}>
+
+                          <CheckCircle size={14} /> Approve
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className={`flex-1 h-9 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-all duration-200
+                          ${theme === 'dark' ?
+                              'text-red-400 border-red-400/50 bg-red-400/5 hover:bg-red-400/20' :
+                              'text-red-700 border-red-200 bg-red-50 hover:bg-red-100'}`
+                          }
+                          onClick={() => handleReject(index)}
+                          disabled={isLoading}>
+
+                          <XCircle size={14} /> Reject
+                        </Button>
+                      </div> :
+
+                      <div className="pt-2 text-center border-t border-border/30">
+                        <span className={`text-xs ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+                          {row.status === "Endorsed (Pending Principal)" ? "Endorsed (Forwarded to Principal)" : "No action needed"}
+                        </span>
+                      </div>
+                    }
+                  </div>
+                ))
+            }
+          </div>
+
+          <div className={`hidden md:block overflow-x-auto custom-scrollbar border rounded-lg ${theme === 'dark' ? 'border-border' : 'border-gray-200'}`}>
+            {isLoading ?
+              <div className="p-4">
+                <SkeletonTable rows={10} cols={7} />
+              </div> :
+
+              <table className="w-full text-sm">
+                <thead className={`${theme === 'dark' ? 'bg-card text-foreground' : 'bg-gray-50 text-gray-900'}`}>
+                  <tr className={`border-b ${theme === 'dark' ? 'border-border' : 'border-gray-200'}`}>
+                    <th className="py-3 px-2 md:px-4 text-left font-semibold">Applicant</th>
+                    <th className="py-3 px-2 md:px-4 text-left font-semibold">Category / Title</th>
+                    <th className="py-3 px-2 md:px-4 text-center font-semibold">Period & Time</th>
+                    <th className="py-3 px-2 md:px-4 text-center font-semibold">Attachments</th>
+                    <th className="py-3 px-2 md:px-4 text-center font-semibold">Reason</th>
+                    <th className="py-3 px-2 md:px-4 text-center font-semibold">Status</th>
+                    <th className="py-3 px-2 md:px-4 text-center font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaveRequests.length === 0 ?
+                    <tr>
+                      <td colSpan={7} className="p-0">
+                        <div className={`border-2 border-dashed flex flex-col items-center justify-center p-12 text-center space-y-4 ${theme === 'dark' ? 'border-border bg-accent/5' : 'border-gray-200 bg-gray-50/50'}`}>
+                          <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-accent/10' : 'bg-primary/10'}`}>
+                            <Filter className={`w-10 h-10 ${theme === 'dark' ? 'text-primary/70' : 'text-primary/70'}`} />
+                          </div>
+                          <div className="max-w-xs mx-auto">
+                            <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+                              No Leave Requests Found
+                            </h3>
+                            <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+                              There are no leave requests matching the selected status or filters.
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                    </tr> :
+
+                    leaveRequests.map((row, index) =>
+                      <tr key={row.id} className={`border-b transition-colors duration-200 ${theme === 'dark' ? 'border-border hover:bg-accent' : 'border-gray-200 hover:bg-gray-50'}`}>
+                        <td className="py-4 px-2 md:px-4 text-left">
+                          <div className={`font-medium ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>{row.name}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded bg-muted text-muted-foreground">
+                              {row.role?.replace('_', ' ')}
+                            </span>
+                            {row.dept && row.dept !== 'N/A' && row.dept !== 'General' && (
+                              <span className={`text-xs ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>{row.dept}</span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="py-4 px-2 md:px-4 text-left">
+                          <div className={`font-medium text-sm ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>{row.title}</div>
+                          {renderLeaveCategoryBadge(row.leave_type, row.is_half_day, row.half_day_session, row.od_purpose_category)}
+                          {row.alternate_faculty_name && (
+                            <div className="text-[11px] text-muted-foreground mt-1">
+                              Sub: <span className="font-medium text-foreground">{row.alternate_faculty_name}</span> ({row.alternate_duty_status})
+                            </div>
+                          )}
+                        </td>
+
+                        <td className={`py-4 px-2 md:px-4 text-sm text-center ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+                          <div>{row.period}</div>
+                          {row.start_time && row.end_time && (
+                            <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
+                              {row.start_time} - {row.end_time}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Attachments Column */}
+                        <td className="py-4 px-2 md:px-4 text-sm text-center">
+                          {row.initial_document_url || row.completion_document_url ? (
+                            <div className="flex flex-col items-center justify-center gap-1.5">
+                              {row.initial_document_url && (
+                                <a
+                                  href={row.initial_document_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors shrink-0 whitespace-nowrap"
+                                  title="View Attached Order / Document Proof"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                                  <span>Attachment</span>
+                                  <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                                </a>
+                              )}
+                              {row.completion_document_url && (
+                                <a
+                                  href={row.completion_document_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors shrink-0 whitespace-nowrap"
+                                  title="View Attendance Certificate"
+                                >
+                                  <FileText className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                  <span>Certificate</span>
+                                  <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-xs italic">—</span>
+                          )}
+                        </td>
+
+                        <td className="py-4 px-2 md:px-4 text-sm text-center">
+                          <button
+                            onClick={() => setViewReason(row.reason)}
+                            className={`text-sm font-medium px-2 py-1 rounded-md ${theme === 'dark' ? 'bg-muted/10 text-foreground border border-border' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
+                            View
+                          </button>
+                        </td>
+
+                        <td className="py-4 px-2 md:px-4 text-sm text-center">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${row.status === "Pending" ?
+                              theme === 'dark' ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-800' :
+                              row.status === "Approved" ?
+                                theme === 'dark' ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700' :
+                                row.status.startsWith("Endorsed") ?
+                                  theme === 'dark' ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700' :
+                                  theme === 'dark' ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-700'}`
+                            }>
+                            {row.status}
+                          </span>
+                        </td>
+
+                        <td className="py-4 px-2 md:px-4 text-sm text-center">
+                          {row.canApprove ?
+                            <div className="flex flex-col md:flex-row items-center justify-center gap-2">
+                              <Button
+                                variant="outline"
+                                className={`px-3 py-1 text-xs flex items-center gap-1 w-full md:w-auto ${theme === 'dark' ?
+                                  'text-green-400 border-green-400 hover:bg-green-900/20' :
+                                  'text-green-700 border-green-600 hover:bg-green-100'}`
+                                }
+                                onClick={() => handleApprove(index)}
+                                disabled={isLoading}>
+                                <CheckCircle size={16} /> Approve
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className={`px-3 py-1 text-xs flex items-center gap-1 w-full md:w-auto ${theme === 'dark' ?
+                                  'text-red-400 border-red-400 hover:bg-red-900/20' :
+                                  'text-red-700 border-red-600 hover:bg-red-100'}`
+                                }
+                                onClick={() => handleReject(index)}
+                                disabled={isLoading}>
+                                <XCircle size={16} /> Reject
+                              </Button>
+                            </div> :
+
+                            <span className={`text-xs ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+                              {row.status.startsWith("Endorsed") ? "Endorsed (Forwarded to Next Authority)" : "No action needed"}
+                            </span>
+                          }
+                        </td>
+                      </tr>
+                    )
+                  }
+                </tbody>
+              </table>
+            }
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 &&
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mt-6 pt-6 border-t">
+              <div className={`text-sm ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-600'}`}>
+                Showing {Math.min((currentPage - 1) * 50 + 1, totalCount)} to {Math.min(currentPage * 50, totalCount)} of {totalCount}
+              </div>
+              <div className="flex gap-2 items-center justify-center sm:justify-end">
+                <Button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1 || isLoading}
+                  variant="outline"
+                  className="text-base font-medium px-4 py-2 text-white bg-primary border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white shadow-sm transition-all duration-200">
+
+                  Prev
+                </Button>
+                <span className="px-3 text-base font-medium text-primary">
+                  {currentPage}
+                </span>
+                <Button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages || isLoading}
+                  variant="outline"
+                  className="text-base font-medium px-4 py-2 text-white bg-primary border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white shadow-sm transition-all duration-200">
+
+                  Next
+                </Button>
+              </div>
+            </div>
+          }
+        </CardContent>
+      ) : (
+        <CardContent className="p-4 sm:p-6">
+          <DepartmentStudentLeaves onPendingCountChange={setStudentPendingCount} />
+        </CardContent>
+      )}
+      </Card>
+
+      {/* View Reason Dialog */}
+      <Dialog open={!!viewReason} onOpenChange={() => setViewReason(null)}>
+        <DialogContent className={`${theme === 'dark' ? 'bg-card text-foreground border border-border' : 'bg-white text-gray-900 border border-gray-200'} max-w-[90%] sm:max-w-md mx-auto rounded-xl p-4 sm:p-6`}>
+          <DialogHeader>
+            <DialogTitle className={`text-lg font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Leave Reason</DialogTitle>
+          </DialogHeader>
+
+          <div
+            className={`p-3 text-base leading-relaxed whitespace-pre-wrap break-words 
+                      max-h-64 overflow-y-auto rounded-md ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+
+            {viewReason}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className={theme === 'dark' ?
+                'text-white bg-primary border border-primary hover:bg-primary/90 hover:text-white' :
+                'text-white bg-primary border border-primary hover:bg-primary/90 hover:text-white'}
+              onClick={() => setViewReason(null)}>
+
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>);
+
+};
+
+export default LeaveManagement;

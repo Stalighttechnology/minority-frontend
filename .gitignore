@@ -1,0 +1,79 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+jspm_packages/
+web_modules/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Build output
+dist/
+dist-ssr/
+build/
+dev-dist/
+*.local
+
+# Tests & Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# OS X & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+
+# Environment variables
+.env
+.env.production
+.env.local
+.env.*.local
+
+# Local AI tooling & configs
+.code-review-graph/
+.claude/
+.gemini/
+.codebuddy/
+.qoder/
+.cursor/
+.kiro/
+.opencode/
+.mcp.json
+.opencode.json
+opencode.jsonc
+crg-session-start.sh
+crg-updates.sh
+skills/
+hooks/
+AGENTS.md
+CODEBUDDY.md
+CLAUDE.md
+GEMINI.md
+QODER.md
+.cursorrules
+.windsurfrules
+
+.vercel

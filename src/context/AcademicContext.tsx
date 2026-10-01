@@ -1,0 +1,131 @@
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { getBatches, getBranches } from '../utils/hms_api';
+import { getSemesters as getSemestersApi } from '../utils/student_api';
+
+export interface Batch {
+  id: number;
+  name: string;
+}
+
+export interface Branch {
+  id: number;
+  name: string;
+}
+
+export interface Semester {
+  id: string;
+  number: number;
+}
+
+interface AcademicContextType {
+  batches: Batch[];
+  branches: Branch[];
+  loading: boolean;
+  fetchBatches: () => Promise<void>;
+  fetchBranches: () => Promise<void>;
+  getSemestersForBranch: (branchId: number) => Promise<Semester[]>;
+}
+
+const AcademicContext = createContext<AcademicContextType | undefined>(undefined);
+
+let cachedBatches: Batch[] | null = null;
+let cachedBranches: Branch[] | null = null;
+let cachedSemestersMap: Record<string, Semester[]> | null = null;
+
+export const AcademicProvider: React.FC<{children: React.ReactNode;}> = ({ children }) => {
+  const [batches, setBatches] = useState<Batch[]>(cachedBatches || []);
+  const [branches, setBranches] = useState<Branch[]>(cachedBranches || []);
+  const [semestersMap, setSemestersMap] = useState<Record<string, Semester[]>>(cachedSemestersMap || {});
+  const [loading, setLoading] = useState(false);
+  const fetchRef = useRef(false);
+  const semesterCache = useRef<Record<number, Semester[]>>({});
+
+  const fetchBatches = async () => {
+    if (cachedBatches && cachedBatches.length > 0) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await getBatches();
+      if (response.success && response.results) {
+        const batchesData = response.results;
+        setBatches(batchesData);
+        cachedBatches = batchesData;
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBranches = async () => {
+    if (cachedBranches && cachedBranches.length > 0) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await getBranches();
+      if (response.success && response.results) {
+        const branchesData = response.results;
+        setBranches(branchesData);
+        cachedBranches = branchesData;
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getSemestersForBranch = async (branchId: number): Promise<Semester[]> => {
+    if (!branchId || isNaN(branchId)) return [];
+
+    // Check local pre-loaded map first (Performance Optimization)
+    const bIdStr = branchId.toString();
+    if (semestersMap[bIdStr]) {
+
+      return semestersMap[bIdStr];
+    }
+
+    if (semesterCache.current[branchId]) return semesterCache.current[branchId];
+
+    try {
+
+      const response = await getSemestersApi(bIdStr);
+      let results: Semester[] = [];
+
+      if (response && response.success && response.data) {
+        results = Array.isArray(response.data) ? response.data : response.data.results || [];
+      } else if (Array.isArray(response)) {
+        results = response;
+      } else if (response && response.results) {
+        results = response.results;
+      }
+
+      if (results.length > 0) {
+        semesterCache.current[branchId] = results;
+      }
+      return results;
+    } catch (error) {
+
+      return [];
+    }
+  };
+
+  // Left empty so data fetching is triggered lazily by consumer components when they mount.
+
+  return (
+    <AcademicContext.Provider value={{ batches, branches, loading, fetchBatches, fetchBranches, getSemestersForBranch }}>
+      {children}
+    </AcademicContext.Provider>);
+
+};
+
+export const useAcademicContext = () => {
+  const context = useContext(AcademicContext);
+  if (context === undefined) {
+    throw new Error('useAcademicContext must be used within an AcademicProvider');
+  }
+  return context;
+};

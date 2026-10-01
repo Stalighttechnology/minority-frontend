@@ -1,0 +1,1419 @@
+import { translateTerminology, getTerm, getInstitutionType } from "@/utils/institutionConfig";
+import { useState, useEffect, useCallback, ReactNode, Component, useRef } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../ui/card";
+import { Button } from "../ui/button";
+import { SkeletonTable } from "../ui/skeleton";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/select";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../ui/dropdown-menu";
+import { Checkbox } from "../ui/checkbox";
+import { Pencil, Trash2, Loader2, ChevronLeft, ChevronRight, ChevronDown, Search, FileDown } from "lucide-react";
+import { manageFacultyAssignments, manageSections, getFacultyAssignmentsBootstrap, getHODTimetableSemesterData, listFacultyBranches, manageFaculties } from "../../utils/hod_api";
+import { useTheme } from "../../context/ThemeContext";
+import { API_ENDPOINT } from "../../utils/config";
+import { fetchWithTokenRefresh } from "../../utils/authService";
+import Swal from "sweetalert2";
+import { showSuccessAlert, showErrorAlert } from "../../utils/sweetalert";
+
+// Interfaces
+interface FacultyAssignmentsProps {
+  setError: (error: string | null) => void;
+}
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  errorMessage: string;
+}
+
+interface ManageFacultyAssignmentsRequest {
+  action: "create" | "update" | "delete";
+  assignment_id?: string;
+  faculty_id?: string;
+  subject_id?: string;
+  semester_id?: string;
+  section_id?: string;
+  branch_id: string;
+}
+
+interface Assignment {
+  id: string;
+  faculty: string;
+  subject: string;
+  section: string;
+  semester: number;
+  faculty_id: string;
+  subject_id: string;
+  section_id: string;
+  semester_id: string;
+  branch_id?: string; // Add optional branch_id property
+}
+
+interface Faculty {
+  id: string;
+  username: string;
+  first_name: string;
+  last_name: string | null;
+  name?: string; // Add optional name property
+}
+
+interface Subject {
+  id: string;
+  name: string;
+  subject_code: string;
+  semester_id: string; // Only string type
+}
+
+interface Section {
+  id: string;
+  name: string;
+  semester_id: string; // Only string type
+}
+
+interface Semester {
+  id: string;
+  number: number;
+}
+
+// Define types for API responses
+interface SemesterData {
+  id: number | string; // Allow both types
+  number: number;
+}
+
+interface FacultyData {
+  id: string;
+  username: string;
+  first_name: string;
+  last_name: string | null;
+}
+
+interface SubjectData {
+  id: string;
+  name: string;
+  subject_code: string;
+  semester_id: number;
+}
+
+interface SectionData {
+  id: string;
+  name: string;
+  semester_id: number;
+}
+
+interface AssignmentData {
+  id: string;
+  faculty: string;
+  subject: string;
+  section: string;
+  semester: number;
+  faculty_id: string;
+  subject_id: string;
+  section_id: string;
+  semester_id: string;
+}
+
+interface ProfileData {
+  branch_id: string;
+}
+
+interface HODSubjectBootstrapResponse {
+  profile: ProfileData;
+  semesters: SemesterData[];
+  faculties: FacultyData[];
+}
+
+interface ManageAssignmentsResponse {
+  success: boolean;
+  data?: {
+    assignment_id?: string;
+    assignments?: AssignmentData[];
+  };
+  message?: string;
+}
+
+// Define error type for catch blocks
+interface ErrorWithMessage {
+  message: string;
+}
+
+// Type guard to check if an object has a message property
+function isErrorWithMessage(error: unknown): error is ErrorWithMessage {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as Record<string, unknown>).message === 'string');
+
+}
+
+// Error Boundary Component
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false, errorMessage: "" };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, errorMessage: error.message };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="text-center py-6 text-red-500">
+          <h2>Error: {this.state.errorMessage}</h2>
+          <p>Please try refreshing the page or contact support.</p>
+        </div>);
+
+    }
+    return this.props.children;
+  }
+}
+
+const FacultyAssignments = ({ setError }: FacultyAssignmentsProps) => {
+  const { theme } = useTheme();
+  const formRef = useRef<HTMLDivElement>(null);
+  const [isBranchOpen, setIsBranchOpen] = useState(false);
+  const [isFacultyOpen, setIsFacultyOpen] = useState(false);
+  const [isSemesterOpen, setIsSemesterOpen] = useState(false);
+  const [isSubjectOpen, setIsSubjectOpen] = useState(false);
+  const [isSectionOpen, setIsSectionOpen] = useState(false);
+  const [isFilterSemesterOpen, setIsFilterSemesterOpen] = useState(false);
+  const [isFilterSectionOpen, setIsFilterSectionOpen] = useState(false);
+  const [state, setState] = useState({
+    facultyId: "",
+    subjectId: "",
+    sectionId: "",
+    sectionIds: [] as string[],
+    semesterId: "",
+    assignments: [] as Assignment[],
+    editingId: null as string | null,
+    deleteId: null as string | null,
+    openDeleteModal: false,
+    loading: true,
+    isAssigning: false,
+    subjects: [] as Subject[],
+    sections: [] as Section[],
+    semesters: [] as Semester[],
+    faculties: [] as Faculty[],
+    allBranches: [] as {id: string;name: string;}[],
+    selectedBranchForFaculty: "",
+    facultySearch: "",
+    facultyPage: 1,
+    facultyTotalPages: 1,
+    loadingFaculties: false,
+    branchId: "",
+    filterSemesterId: "",
+    filterSectionId: "",
+    filterSections: [] as Section[],
+    isFirstLoad: true,
+    assignmentsPage: 1,
+    assignmentsTotalPages: 1
+  });
+  const [localFacultySearch, setLocalFacultySearch] = useState("");
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+
+  const handleExportPDF = async () => {
+    if (!state.filterSemesterId || !state.filterSectionId) return;
+    setDownloadingPDF(true);
+    try {
+      const queryParams = `?semester_id=${state.filterSemesterId}&section_id=${state.filterSectionId}`;
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/faculty-assignments/export-pdf/${queryParams}`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Faculty_Assignments_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showSuccessAlert("Success", "Faculty assignments PDF exported successfully");
+      } else {
+        const result = await response.json().catch(() => ({}));
+        showErrorAlert("Error", result.message || "Failed to export PDF");
+      }
+    } catch (err) {
+      showErrorAlert("Error", "Network error while exporting PDF");
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
+  const getSemesterName = (number: number) => {
+    if (getInstitutionType() === 'school') {
+      return `Class ${number}`;
+    }
+    return `Semester ${number}`;
+  };
+
+  // Helper to update state (stable reference for hooks)
+  const updateState = useCallback((newState: Partial<typeof state>) => {
+    setState((prev) => ({ ...prev, ...newState }));
+  }, []);
+
+  // Small helpers to reduce cognitive complexity in handlers
+  const buildFacultyName = (id: string) => {
+    const f = state.faculties.find((x) => x.id === id);
+    return f ? `${f.first_name} ${f.last_name || ''}`.trim() : 'This faculty';
+  };
+
+  const hasDuplicateAssignment = (subjectId: string, sectionId: string, semesterId: string, excludeId?: string) =>
+  state.assignments.some((a) => a.subject_id === subjectId && a.section_id === sectionId && a.semester_id === semesterId && a.id !== excludeId);
+
+  const hasDuplicateFaculty = (facultyId: string, subjectId: string, sectionId: string, semesterId: string, excludeId?: string) =>
+  state.assignments.some((a) => a.faculty_id === facultyId && a.subject_id === subjectId && a.section_id === sectionId && a.semester_id === semesterId && a.id !== excludeId);
+
+  const buildAssignmentFromForm = (form?: {facultyId?: string;subjectId?: string;sectionId?: string;semesterId?: string;}) => {
+    const fId = form?.facultyId ?? state.facultyId;
+    const sId = form?.subjectId ?? state.subjectId;
+    const secId = form?.sectionId ?? state.sectionId;
+    const semId = form?.semesterId ?? state.semesterId;
+
+    return {
+      faculty_id: fId,
+      subject_id: sId,
+      section_id: secId,
+      semester_id: semId,
+      faculty: buildFacultyName(fId),
+      subject: state.subjects.find((s) => s.id === sId)?.name || '',
+      section: state.sections.find((s) => s.id === secId)?.name || '',
+      semester: state.semesters.find((s) => s.id === semId)?.number || 0
+    } as Partial<Assignment>;
+  };
+
+  type FormState = {
+    facultyId: string;
+    subjectId: string;
+    sectionId: string;
+    semesterId: string;
+    editingId: string | null;
+  };
+
+  // Optimistic helpers (separate create vs update to avoid branching flag)
+  const applyOptimisticCreate = (tempId?: string) => {
+    const newAssignment: Assignment = {
+      id: tempId || `temp-${Date.now()}`,
+      ...(buildAssignmentFromForm() as Assignment)
+    };
+    updateState({ assignments: [...state.assignments, newAssignment] });
+  };
+
+  const applyOptimisticEdit = () => {
+    const updateFields = buildAssignmentFromForm();
+    const updatedAssignments = state.assignments.map((assignment) =>
+    assignment.id === state.editingId ? { ...assignment, ...updateFields } : assignment
+    );
+    updateState({ assignments: updatedAssignments });
+  };
+
+  const reconcileCreateResponse = (response: ManageAssignmentsResponse, originalFormStateLocal: FormState) => {
+    const createdId = response.data?.assignment_id;
+    if (createdId) {
+      const replaced = state.assignments.map((a) => String(a.id).startsWith('temp-') && a.faculty_id === originalFormStateLocal.facultyId && a.subject_id === originalFormStateLocal.subjectId && a.section_id === originalFormStateLocal.sectionId && a.semester_id === originalFormStateLocal.semesterId ?
+      { ...a, id: createdId } :
+      a
+      );
+      updateState({ assignments: replaced });
+    }
+  };
+
+  const revertOptimisticChanges = (originalAssignmentsLocal: Assignment[], originalFormStateLocal: FormState) => {
+    updateState({
+      assignments: originalAssignmentsLocal,
+      facultyId: originalFormStateLocal.facultyId,
+      subjectId: originalFormStateLocal.subjectId,
+      sectionId: originalFormStateLocal.sectionId,
+      semesterId: originalFormStateLocal.semesterId,
+      editingId: originalFormStateLocal.editingId
+    });
+  };
+
+  const saveCreateAssignment = async (data: ManageFacultyAssignmentsRequest, originalAssignmentsLocal: Assignment[], originalFormStateLocal: FormState) => {
+    updateState({ isAssigning: true, loading: true });
+    try {
+      const response = (await manageFacultyAssignments(data, "POST")) as ManageAssignmentsResponse;
+      if (response.success) {
+        reconcileCreateResponse(response, originalFormStateLocal);
+      } else {
+        throw new Error(response.message || "Failed to save assignment");
+      }
+    } catch (err) {
+      revertOptimisticChanges(originalAssignmentsLocal, originalFormStateLocal);
+      if (isErrorWithMessage(err)) {
+        const errorMessage = err.message || "Network error";
+        showErrorAlert("Error", errorMessage);
+        setError(errorMessage);
+      } else {
+        const errorMessage = "Network error";
+        showErrorAlert("Error", errorMessage);
+        setError(errorMessage);
+      }
+    } finally {
+      updateState({ isAssigning: false, loading: false });
+    }
+  };
+
+  const saveUpdateAssignment = async (data: ManageFacultyAssignmentsRequest, originalAssignmentsLocal: Assignment[], originalFormStateLocal: FormState) => {
+    updateState({ isAssigning: true, loading: true });
+    try {
+      const response = (await manageFacultyAssignments(data, "POST")) as ManageAssignmentsResponse;
+      if (!response.success) {
+        throw new Error(response.message || "Failed to save assignment");
+      }
+      // No further reconciliation needed for update; optimistic edit already applied
+    } catch (err) {
+      revertOptimisticChanges(originalAssignmentsLocal, originalFormStateLocal);
+      if (isErrorWithMessage(err)) {
+        const errorMessage = err.message || "Network error";
+        showErrorAlert("Error", errorMessage);
+        setError(errorMessage);
+      } else {
+        const errorMessage = "Network error";
+        showErrorAlert("Error", errorMessage);
+        setError(errorMessage);
+      }
+    } finally {
+      updateState({ isAssigning: false, loading: false });
+    }
+  };
+
+  // Fetch initial data
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      updateState({ loading: true });
+      try {
+        const boot = await getFacultyAssignmentsBootstrap();
+        if (!boot.success || !boot.data) {
+          throw new Error(boot.message || "Failed to bootstrap faculty assignments");
+        }
+
+        const profile = boot.data.profile;
+        const semesters = boot.data.semesters.map((s: any) => ({
+          id: s.id.toString(),
+          number: s.number
+        }));
+        const faculties = boot.data.faculties;
+        const facultiesPagination = boot.data.faculties_pagination;
+
+        const branchesRes = await listFacultyBranches();
+        const allBranches = branchesRes.success ? branchesRes.data || [] : [];
+
+        updateState({
+          branchId: profile.branch_id,
+          semesters,
+          allBranches,
+          faculties: faculties.map((f: any) => ({
+            ...f,
+            name: `${f.first_name} ${f.last_name || ""}`.trim()
+          })),
+          facultyTotalPages: facultiesPagination?.total_pages || 1,
+          selectedBranchForFaculty: "" // Do not auto-select, allow choosing branch
+        });
+      } catch (err) {
+        if (isErrorWithMessage(err)) {
+          const errorMessage = err.message || "Network error";
+          setError(errorMessage);
+          showErrorAlert("Error", errorMessage);
+        } else {
+          const errorMessage = "Network error";
+          setError(errorMessage);
+          showErrorAlert("Error", errorMessage);
+        }
+      } finally {
+        updateState({ loading: false });
+      }
+    };
+    fetchInitialData();
+  }, [setError, updateState]);
+
+  // Fetch faculties when branch or search changes
+  useEffect(() => {
+    const fetchFacultiesData = async () => {
+      if (!state.selectedBranchForFaculty) {
+        updateState({ faculties: [], facultyTotalPages: 1, facultyPage: 1 });
+        return;
+      }
+      
+      // Prevent redundant fetch on initial load since bootstrap already provides this data
+      if (state.isFirstLoad && state.selectedBranchForFaculty === state.branchId && !state.facultySearch) {
+        updateState({ isFirstLoad: false });
+        return;
+      }
+
+      updateState({ loadingFaculties: true });
+      try {
+        const res = await manageFaculties({
+          branch_id: state.selectedBranchForFaculty,
+          search: state.facultySearch,
+          page_size: 1000 // Fetch many for frontend pagination
+        });
+
+        if (res.success) {
+          const allFaculties = res.data.map((f: any) => ({
+            ...f,
+            name: `${f.first_name} ${f.last_name || ""}`.trim()
+          }));
+          updateState({
+            faculties: allFaculties,
+            facultyPage: 1,
+            facultyTotalPages: Math.ceil(allFaculties.length / 10)
+          });
+        }
+      } catch (err) {
+
+      } finally {
+        updateState({ loadingFaculties: false });
+      }
+    };
+
+    fetchFacultiesData();
+  }, [state.selectedBranchForFaculty, state.facultySearch, updateState]);
+
+  // Sync local search to state.facultySearch with debounce to avoid excessive re-renders
+  useEffect(() => {
+    if (localFacultySearch === state.facultySearch) return;
+    const timer = setTimeout(() => {
+      updateState({ facultySearch: localFacultySearch, facultyPage: 1 });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localFacultySearch, state.facultySearch, updateState]);
+
+  // Cache for subjects and sections to avoid refetching on optimistic update reverts
+  const semesterCache = useRef<{ subjects: Record<string, any[]>; sections: Record<string, any[]> }>({
+    subjects: {},
+    sections: {}
+  });
+
+  // Fetch subjects and sections when semester changes
+  useEffect(() => {
+    const fetchSemesterData = async () => {
+      if (!state.semesterId || !state.branchId) return;
+
+      if (semesterCache.current.subjects[state.semesterId] && semesterCache.current.sections[state.semesterId]) {
+        updateState({
+          subjects: semesterCache.current.subjects[state.semesterId],
+          sections: semesterCache.current.sections[state.semesterId]
+        });
+        return;
+      }
+
+      updateState({ loading: true });
+      try {
+        const res = await getHODTimetableSemesterData(state.semesterId, "sections,subjects");
+        if (res.success && res.data) {
+          semesterCache.current.subjects[state.semesterId] = res.data.subjects || [];
+          semesterCache.current.sections[state.semesterId] = res.data.sections || [];
+          updateState({
+            subjects: res.data.subjects || [],
+            sections: res.data.sections || []
+          });
+        }
+      } catch (err) {
+
+      } finally {
+        updateState({ loading: false });
+      }
+    };
+    fetchSemesterData();
+  }, [state.semesterId, state.branchId, updateState]);
+
+  // Fetch sections for filter when filter semester changes
+  useEffect(() => {
+    const fetchFilterSections = async () => {
+      if (!state.filterSemesterId || !state.branchId) {
+        updateState({ filterSections: [], filterSectionId: "" });
+        return;
+      }
+
+      try {
+        const sectionsRes = await manageSections({ branch_id: state.branchId, semester_id: state.filterSemesterId }, "GET");
+        if (sectionsRes.success) {
+          updateState({ filterSections: sectionsRes.data || [], filterSectionId: "" });
+        }
+      } catch (err) {
+
+      }
+    };
+    fetchFilterSections();
+  }, [state.filterSemesterId, state.branchId, updateState]);
+
+  // Fetch assignments when filters change
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      if (!state.branchId || !state.filterSemesterId || !state.filterSectionId) {
+        updateState({ assignments: [] });
+        return;
+      }
+
+      updateState({ loading: true });
+      try {
+        const response = await manageFacultyAssignments({
+          branch_id: state.branchId,
+          semester_id: state.filterSemesterId,
+          section_id: state.filterSectionId,
+          page: state.assignmentsPage
+        }, "GET");
+
+        if (response.success && (response.data?.assignments || (response as any).results?.data?.assignments)) {
+          updateState({
+            assignments: response.data?.assignments || (response as any).results?.data?.assignments,
+            assignmentsTotalPages: response.total_pages || Math.ceil((response.count || 0) / 10) || 1
+          });
+        }
+      } catch (err) {
+
+      } finally {
+        updateState({ loading: false });
+      }
+    };
+
+    fetchAssignments();
+  }, [state.branchId, state.filterSemesterId, state.filterSectionId, state.assignmentsPage, updateState]);
+
+  const resetForm = () => {
+    updateState({
+      facultyId: "",
+      subjectId: "",
+      sectionId: "",
+      sectionIds: [],
+      semesterId: "",
+      editingId: null
+    });
+  };
+
+  const validateForm = () => {
+    const selectedSecIds = state.sectionIds.length > 0 ? state.sectionIds : (state.sectionId ? [state.sectionId] : []);
+    if (!state.facultyId || !state.subjectId || selectedSecIds.length === 0 || !state.semesterId) {
+      showErrorAlert("Error", "Please select all required fields including at least one section");
+      return false;
+    }
+    if (!state.faculties.some((f) => f.id === state.facultyId)) {
+      showErrorAlert("Error", "Invalid faculty selected");
+      return false;
+    }
+    if (!state.subjects.some((s) => s.id === state.subjectId)) {
+      showErrorAlert("Error", "Invalid subject selected");
+      return false;
+    }
+    if (!state.sections.some((sec) => selectedSecIds.includes(sec.id))) {
+      showErrorAlert("Error", "Invalid section selected");
+      return false;
+    }
+    if (!state.semesters.some((s) => s.id === state.semesterId)) {
+      showErrorAlert("Error", "Invalid semester selected");
+      return false;
+    }
+    return true;
+  };
+
+  const handleAssignFaculty = async () => {
+    if (!validateForm() || !state.branchId) return;
+
+    const selectedSecIds = state.sectionIds.length > 0 ? state.sectionIds : [state.sectionId];
+
+    // Check duplicate assignments for each section
+    for (const secId of selectedSecIds) {
+      if (hasDuplicateAssignment(state.subjectId, secId, state.semesterId, state.editingId)) {
+        const dup = state.assignments.find((a) => a.subject_id === state.subjectId && a.section_id === secId && a.semester_id === state.semesterId && a.id !== state.editingId);
+        showErrorAlert("Duplicate Assignment", `Subject "${dup?.subject || ''}" is already assigned to Section ${dup?.section || ''}, Semester ${dup?.semester || ''}. Only one faculty can be assigned.`);
+        return;
+      }
+
+      if (hasDuplicateFaculty(state.facultyId, state.subjectId, secId, state.semesterId, state.editingId)) {
+        const dupF = state.assignments.find((a) => a.faculty_id === state.facultyId && a.subject_id === state.subjectId && a.section_id === secId && a.semester_id === state.semesterId && a.id !== state.editingId);
+        const facultyName = buildFacultyName(state.facultyId);
+        showErrorAlert("Duplicate Faculty Assignment", `${facultyName} is already assigned to ${dupF?.subject || ''} - Section ${dupF?.section || ''}, Semester ${dupF?.semester || ''}.`);
+        return;
+      }
+    }
+
+    const isEditing = !!state.editingId;
+    const originalAssignments = [...state.assignments];
+
+    updateState({ isAssigning: true, loading: true });
+
+    try {
+      if (isEditing) {
+        // Update the assignment being edited with the first selected section
+        const primarySecId = selectedSecIds[0];
+        const updateData: ManageFacultyAssignmentsRequest = {
+          action: "update",
+          assignment_id: state.editingId!,
+          faculty_id: state.facultyId,
+          subject_id: state.subjectId,
+          semester_id: state.semesterId,
+          section_id: primarySecId,
+          branch_id: state.branchId
+        };
+        await manageFacultyAssignments(updateData, "POST");
+
+        // Create new assignments for any additional selected sections
+        for (let i = 1; i < selectedSecIds.length; i++) {
+          const createData: ManageFacultyAssignmentsRequest = {
+            action: "create",
+            faculty_id: state.facultyId,
+            subject_id: state.subjectId,
+            semester_id: state.semesterId,
+            section_id: selectedSecIds[i],
+            branch_id: state.branchId
+          };
+          await manageFacultyAssignments(createData, "POST");
+        }
+      } else {
+        // Create assignments for all selected sections
+        for (const secId of selectedSecIds) {
+          const createData: ManageFacultyAssignmentsRequest = {
+            action: "create",
+            faculty_id: state.facultyId,
+            subject_id: state.subjectId,
+            semester_id: state.semesterId,
+            section_id: secId,
+            branch_id: state.branchId
+          };
+          await manageFacultyAssignments(createData, "POST");
+        }
+      }
+
+      resetForm();
+      showSuccessAlert(
+        isEditing ? "Updated" : "Success",
+        isEditing
+          ? "Faculty assignment updated successfully"
+          : `Faculty assigned successfully to ${selectedSecIds.length} section(s)`
+      );
+
+      // Refresh list if filter is currently active
+      if (state.filterSemesterId && state.filterSectionId) {
+        const response = await manageFacultyAssignments({
+          branch_id: state.branchId,
+          semester_id: state.filterSemesterId,
+          section_id: state.filterSectionId,
+          page: state.assignmentsPage
+        }, "GET");
+        if (response.success && (response.data?.assignments || (response as any).results?.data?.assignments)) {
+          updateState({
+            assignments: response.data?.assignments || (response as any).results?.data?.assignments
+          });
+        }
+      }
+    } catch (err) {
+      updateState({ assignments: originalAssignments });
+      const errorMessage = isErrorWithMessage(err) ? err.message : "Failed to save assignment";
+      showErrorAlert("Error", errorMessage);
+      setError(errorMessage);
+    } finally {
+      updateState({ isAssigning: false, loading: false });
+    }
+  };
+
+  const handleEdit = (assignment: Assignment) => {
+    // Find all sections currently assigned to this faculty for this subject and semester
+    const matchingSectionIds = state.assignments
+      .filter((a) => a.faculty_id === assignment.faculty_id && a.subject_id === assignment.subject_id && a.semester_id === assignment.semester_id)
+      .map((a) => a.section_id);
+    
+    const initialSectionIds = matchingSectionIds.length > 0 ? Array.from(new Set([assignment.section_id, ...matchingSectionIds])) : [assignment.section_id];
+
+    updateState({
+      editingId: assignment.id,
+      selectedBranchForFaculty: assignment.branch_id || state.branchId,
+      facultyId: assignment.faculty_id,
+      subjectId: assignment.subject_id,
+      sectionId: assignment.section_id,
+      sectionIds: initialSectionIds,
+      semesterId: assignment.semester_id
+    });
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleDelete = (deleteId: string) => {
+    Swal.fire({
+      title: "Delete Assignment?",
+      html: `Are you sure you want to delete this assignment? This action cannot be undone.<br><br><span style="color: #ef4444; font-weight: bold;">Warning:</span> The added classes for this subject in the timetable list will also get deleted.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: theme === 'dark' ? '#374151' : '#e5e7eb',
+      confirmButtonText: "Yes, delete it",
+      cancelButtonText: "Cancel",
+      background: theme === 'dark' ? '#1f2937' : '#ffffff',
+      color: theme === 'dark' ? '#f3f4f6' : '#111827',
+      iconColor: "#ef4444"
+    }).then((result) => {
+      if (result.isConfirmed) {
+        executeDelete(deleteId);
+      }
+    });
+  };
+
+  const executeDelete = async (deleteId: string) => {
+    if (!deleteId || !state.branchId) return;
+
+    // Store original state for potential reversion
+    const originalAssignments = [...state.assignments];
+
+    // Optimistic update: remove assignment from list
+    const updatedAssignments = state.assignments.filter((a) => a.id !== deleteId);
+    updateState({ assignments: updatedAssignments });
+
+    updateState({ loading: true });
+
+    try {
+      const data: ManageFacultyAssignmentsRequest = {
+        action: "delete",
+        assignment_id: deleteId,
+        branch_id: state.branchId
+      };
+      const response = await manageFacultyAssignments(data, "POST");
+      if (response.success) {
+        // Deletion succeeded on server; we already removed it optimistically
+        Swal.fire({
+          title: "Deleted!",
+          text: "The assignment has been deleted.",
+          icon: "success",
+          timer: 1500,
+          showConfirmButton: false,
+          background: theme === 'dark' ? '#1f2937' : '#ffffff',
+          color: theme === 'dark' ? '#f3f4f6' : '#111827'
+        });
+      } else {
+        throw new Error(response.message || "Failed to delete assignment");
+      }
+    } catch (err) {
+      // Revert optimistic changes
+      updateState({ assignments: originalAssignments });
+
+      const errorMessage = isErrorWithMessage(err) ? err.message : "Network error";
+      setError(errorMessage);
+
+      Swal.fire({
+        title: "Error!",
+        text: errorMessage,
+        icon: "error",
+        background: theme === 'dark' ? '#1f2937' : '#ffffff',
+        color: theme === 'dark' ? '#f3f4f6' : '#111827'
+      });
+    } finally {
+      updateState({ loading: false });
+    }
+  };
+
+  const filteredAssignments = state.assignments;
+  const facultyMap = state.faculties.reduce((acc, f) => {
+    acc[f.id] = {
+      name: `${f.first_name} ${f.last_name || ""}`.trim(),
+      email: f.username
+    };
+    return acc;
+  }, {} as Record<string, {name: string;email: string;}>);
+
+
+  return (
+    <ErrorBoundary>
+      <div id="hod-faculty-assignments-container" className={` space-y-6 ${theme === 'dark' ? 'bg-background text-foreground' : 'bg-gray-50 text-gray-900'}`}>
+        <Card id="add-faculty-assignment-card" ref={formRef} className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-200'}>
+          <CardHeader className="border-b pb-2">
+            <CardTitle className={`text-2xl font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>{state.editingId ? "Edit Faculty Assignment" : "Add Faculty Assignment"}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={`block mb-1 text-md ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>{translateTerminology("Branch")}
+                <Select
+                    open={isBranchOpen}
+                    onOpenChange={setIsBranchOpen}
+                    value={state.selectedBranchForFaculty}
+                    onValueChange={(value) => {
+                      updateState({ selectedBranchForFaculty: value, facultyPage: 1, facultyId: "" });
+                      setTimeout(() => setIsFacultyOpen(true), 150);
+                    }}
+                    disabled={state.loading || state.isAssigning}>
+                    
+                  <SelectTrigger className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}>
+                    <SelectValue placeholder={translateTerminology("Choose Branch")} />
+                  </SelectTrigger>
+                  <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                    {state.allBranches.length > 0 ? (
+                      state.allBranches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id} className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>
+                          {branch.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled className="text-center text-xs text-muted-foreground">
+                        No branches available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                </label>
+              </div>
+              <div>
+                <label className={`block mb-1 text-md ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Faculty
+                <Select
+                    open={isFacultyOpen}
+                    onOpenChange={(open) => {
+                      if (!open && document.activeElement?.tagName.toLowerCase() === 'input') {
+                        return;
+                      }
+                      setIsFacultyOpen(open);
+                    }}
+                    value={state.facultyId}
+                    onValueChange={(value) => {
+                      updateState({ facultyId: value });
+                      setTimeout(() => setIsSemesterOpen(true), 150);
+                    }}
+                    disabled={state.loading || state.isAssigning || !state.selectedBranchForFaculty}>
+                    
+                  <SelectTrigger className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}>
+                    <SelectValue placeholder={state.loadingFaculties ? "Loading..." : "Choose Faculty"} />
+                  </SelectTrigger>
+                  <SelectContent 
+                    className={theme === 'dark' ? 'bg-card text-foreground border-border max-h-[320px] overflow-hidden flex flex-col z-[9999]' : 'bg-white text-gray-900 border-gray-300 max-h-[320px] overflow-hidden flex flex-col z-[9999]'}
+                    onPointerDownOutside={() => {
+                      if (document.activeElement?.tagName.toLowerCase() === 'input') {
+                        (document.activeElement as HTMLElement).blur();
+                      }
+                    }}
+                  >
+                    <div
+                      className={`px-3 py-2 border-b border-border sticky top-0 z-10 ${theme === 'dark' ? 'bg-card' : 'bg-white'}`}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onMouseUp={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onPointerUp={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onTouchEnd={(e) => e.stopPropagation()}
+                    >
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <input
+                            type="text"
+                            autoFocus
+                            placeholder="Search faculty..."
+                            value={localFacultySearch}
+                            onChange={(e) => setLocalFacultySearch(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onMouseUp={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onPointerUp={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => e.stopPropagation()}
+                            className={`w-full pl-8 pr-10 py-1.5 text-sm rounded border ${theme === 'dark' ? 'bg-background border-border text-foreground' : 'bg-white border-gray-300 text-gray-900'}`} />
+                        {localFacultySearch && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setLocalFacultySearch(""); }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors"
+                          >
+                            Clear
+                          </button>
+                        )}
+                          
+                      </div>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto custom-scrollbar">
+                      {(() => {
+                        const selected = state.faculties.find((f) => f.id === state.facultyId) || 
+                          (() => {
+                            if (!state.facultyId) return undefined;
+                            const foundAssignment = state.assignments.find((a) => a.faculty_id === state.facultyId);
+                            if (foundAssignment) {
+                              const names = foundAssignment.faculty.split(' ');
+                              return {
+                                id: state.facultyId,
+                                username: '',
+                                first_name: names[0],
+                                last_name: names.slice(1).join(' ') || null,
+                                name: foundAssignment.faculty
+                              };
+                            }
+                            return undefined;
+                          })();
+ 
+                        if (state.loadingFaculties) {
+                          return (
+                            <>
+                              <div className="p-4 text-center text-sm text-muted-foreground">Loading...</div>
+                              {selected && (
+                                <SelectItem key={selected.id} value={selected.id} className="hidden">
+                                  {selected.first_name} {selected.last_name || ""}
+                                </SelectItem>
+                              )}
+                            </>
+                          );
+                        }
+ 
+                        if (state.faculties.length === 0) {
+                          return (
+                            <>
+                              <SelectItem value="none" disabled className="text-center text-xs text-muted-foreground py-4">
+                                No faculty available
+                              </SelectItem>
+                              {selected && (
+                                <SelectItem key={selected.id} value={selected.id} className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>
+                                  {selected.first_name} {selected.last_name || ""}
+                                </SelectItem>
+                              )}
+                            </>
+                          );
+                        }
+                        
+                        const sliced = state.faculties.slice((state.facultyPage - 1) * 10, state.facultyPage * 10);
+                        const list = [...sliced];
+                        if (selected && !list.some((f) => f.id === selected.id)) {
+                          list.push(selected);
+                        }
+                        
+                        return list.map((faculty) => (
+                          <SelectItem key={faculty.id} value={faculty.id} className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>
+                            {faculty.first_name} {faculty.last_name || ""} {faculty.username ? `(${faculty.username})` : ""}
+                          </SelectItem>
+                        ));
+                      })()}
+                    </div>
+                    {state.facultyTotalPages > 1 &&
+                      <div className={`px-3 py-2 border-t border-border flex items-center justify-between sticky bottom-0 z-10 ${theme === 'dark' ? 'bg-card' : 'bg-white'}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (state.facultyPage > 1) updateState({ facultyPage: state.facultyPage - 1 });
+                          }}
+                          disabled={state.facultyPage === 1}
+                          className={`h-8 w-8 p-0 rounded-md transition-all ${theme === 'dark' ? 'hover:bg-primary/20 border-border' : 'hover:bg-primary/10 border-gray-200'}`}>
+                          
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-bold px-2 py-1 rounded ${theme === 'dark' ? 'bg-primary/20 text-primary' : 'bg-primary/10 text-primary'}`}>
+                            {state.facultyPage}
+                          </span>
+                          <span className={`text-xs font-medium ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+                            of {state.facultyTotalPages}
+                          </span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (state.facultyPage < state.facultyTotalPages) updateState({ facultyPage: state.facultyPage + 1 });
+                          }}
+                          disabled={state.facultyPage === state.facultyTotalPages}
+                          className={`h-8 w-8 p-0 rounded-md transition-all ${theme === 'dark' ? 'hover:bg-primary/20 border-border' : 'hover:bg-primary/10 border-gray-200'}`}>
+                          
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      }
+                  </SelectContent>
+                </Select>
+                </label>
+              </div>
+              <div>
+                <label className={`block mb-1 text-md ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>{translateTerminology("Semester")}
+                <Select
+                    open={isSemesterOpen}
+                    onOpenChange={setIsSemesterOpen}
+                    value={state.semesterId}
+                    onValueChange={(value) => {
+                      updateState({ semesterId: value, subjectId: "", sectionId: "" });
+                      setTimeout(() => setIsSubjectOpen(true), 150);
+                    }}
+                    disabled={state.loading || state.isAssigning || !state.facultyId}>
+                    
+                  <SelectTrigger className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}>
+                    <SelectValue placeholder={translateTerminology("Choose Semester")} />
+                  </SelectTrigger>
+                  <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                    {state.semesters.length > 0 ? (
+                      state.semesters.map((semester) => (
+                        <SelectItem key={semester.id} value={semester.id} className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>
+                          {getSemesterName(semester.number)}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled className="text-center text-xs text-muted-foreground">
+                        No {translateTerminology("semesters").toLowerCase()} available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                </label>
+              </div>
+              <div>
+                <label className={`block mb-1 text-md ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Course
+                <Select
+                    open={isSubjectOpen}
+                    onOpenChange={setIsSubjectOpen}
+                    value={state.subjectId}
+                    onValueChange={(value) => {
+                      updateState({ subjectId: value });
+                      setTimeout(() => setIsSectionOpen(true), 150);
+                    }}
+                    disabled={state.loading || state.isAssigning || !state.semesterId}>
+                    
+                  <SelectTrigger className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}>
+                    <SelectValue placeholder="Choose Course" />
+                  </SelectTrigger>
+                  <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                    {state.subjects.length > 0 ? (
+                      state.subjects.map((subject) => (
+                        <SelectItem key={subject.id} value={subject.id} className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>
+                          {subject.name} ({subject.subject_code})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled className="text-center text-xs text-muted-foreground">
+                        No courses available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                </label>
+              </div>
+              <div>
+                <label className={`block mb-1 text-md ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Section</label>
+                <DropdownMenu open={isSectionOpen} onOpenChange={setIsSectionOpen}>
+                  <DropdownMenuTrigger asChild disabled={state.loading || state.isAssigning || !state.subjectId}>
+                    <Button
+                      variant="outline"
+                      className={`w-full justify-between font-normal ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}
+                    >
+                      <span className="truncate">
+                        {state.sectionIds.length === 0
+                          ? "Choose Section"
+                          : state.sectionIds.length === 1
+                          ? `Section ${state.sections.find((s) => s.id === state.sectionIds[0])?.name || ''}`
+                          : state.sectionIds.length === state.sections.length && state.sections.length > 1
+                          ? "All Sections Selected"
+                          : state.sections
+                              .filter((sec) => state.sectionIds.includes(sec.id))
+                              .map((sec) => `Section ${sec.name}`)
+                              .join(", ")}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 ml-2 shrink-0" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className={`w-[240px] max-h-[220px] overflow-y-auto custom-scrollbar ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                    {state.sections.length > 0 ? (
+                      <>
+                        <div className="p-2 border-b border-border flex justify-between items-center text-xs">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const allSecIds = state.sections.map((s) => s.id);
+                              updateState({ sectionIds: allSecIds, sectionId: allSecIds[0] || "" });
+                            }}
+                            className="text-primary hover:underline font-semibold"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              updateState({ sectionIds: [], sectionId: "" });
+                            }}
+                            className="text-muted-foreground hover:underline"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        {state.sections.map((section) => {
+                          const isChecked = state.sectionIds.includes(section.id);
+                          return (
+                            <DropdownMenuItem
+                              key={section.id}
+                              onSelect={(e) => e.preventDefault()}
+                              onClick={() => {
+                                let newSecIds: string[];
+                                if (isChecked) {
+                                  newSecIds = state.sectionIds.filter((id) => id !== section.id);
+                                } else {
+                                  newSecIds = [...state.sectionIds, section.id];
+                                }
+                                updateState({ sectionIds: newSecIds, sectionId: newSecIds[0] || "" });
+                              }}
+                              className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm cursor-pointer ${theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}`}
+                            >
+                              <Checkbox
+                                checked={isChecked}
+                                className="pointer-events-none"
+                              />
+                              <span>Section {section.name}</span>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <div className="p-3 text-center text-xs text-muted-foreground">No sections available</div>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              {(state.facultyId || state.subjectId || state.sectionId || state.semesterId || state.editingId) &&
+              <Button
+                variant="outline"
+                onClick={resetForm}
+                disabled={state.loading || state.isAssigning}
+                className={theme === 'dark' ? 'text-foreground bg-card border-border hover:bg-accent' : 'text-gray-900 bg-white border-gray-300 hover:bg-gray-100'}>
+                
+                  Cancel
+                </Button>
+
+              }
+              <Button
+                onClick={handleAssignFaculty}
+                disabled={state.loading || state.isAssigning}
+                className="bg-primary text-white border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white transition-all duration-200 ease-in-out transform hover:scale-105 shadow-md">
+                
+                {(() => {
+                  const loading = state.isAssigning;
+                  let label = "+ Assign Faculty";
+                  if (state.editingId) label = "Update Assignment";
+                  if (loading) label = state.editingId ? "Updating..." : "Assigning...";
+                  return loading ?
+                  <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      {label}
+                    </> :
+                  label;
+                })()}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-200'}>
+          <CardHeader className="border-b pb-2">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center w-full gap-4">
+              <div className="flex items-start justify-between w-full sm:w-auto">
+                <CardTitle className={`text-2xl font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Assignments List</CardTitle>
+                {/* Mobile Download PDF Icon Button */}
+                <Button
+                  onClick={handleExportPDF}
+                  disabled={state.loading || downloadingPDF || !state.filterSemesterId || !state.filterSectionId}
+                  size="icon"
+                  variant="outline"
+                  className="flex sm:hidden h-10 w-10 items-center justify-center shrink-0 border border-input bg-background"
+                >
+                  {downloadingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                </Button>
+              </div>
+              <Button
+                onClick={handleExportPDF}
+                disabled={state.loading || downloadingPDF || !state.filterSemesterId || !state.filterSectionId}
+                className="hidden sm:flex w-full sm:w-auto bg-primary text-white border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white transition-all duration-200 ease-in-out transform hover:scale-105 shadow-md items-center justify-center gap-2">
+                {downloadingPDF ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileDown className="h-4 w-4" />
+                )}
+                <span>Export PDF</span>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Select
+                  open={isFilterSemesterOpen}
+                  onOpenChange={setIsFilterSemesterOpen}
+                  value={state.filterSemesterId}
+                  onValueChange={(value) => {
+                    updateState({ filterSemesterId: value, filterSectionId: "" });
+                    setTimeout(() => setIsFilterSectionOpen(true), 150);
+                  }}
+                  disabled={state.loading}>
+                  
+                  <SelectTrigger className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}>
+                    <SelectValue placeholder={translateTerminology("Choose Semester")} />
+                  </SelectTrigger>
+                  <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                    {state.semesters.length === 0 ? (
+                      <div className="p-2 text-center text-sm text-muted-foreground">No {translateTerminology("semesters").toLowerCase()} available</div>
+                    ) : (
+                      state.semesters.map((semester) => (
+                        <SelectItem key={semester.id} value={semester.id} className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>
+                          {getSemesterName(semester.number)}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2">
+                <Select
+                  open={isFilterSectionOpen}
+                  onOpenChange={setIsFilterSectionOpen}
+                  value={state.filterSectionId}
+                  onValueChange={(value) => updateState({ filterSectionId: value })}
+                  disabled={state.loading || !state.filterSemesterId}>
+                  
+                  <SelectTrigger className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}>
+                    <SelectValue placeholder="Choose Section" />
+                  </SelectTrigger>
+                  <SelectContent className={theme === 'dark' ? 'bg-card text-foreground border-border max-h-[200px] overflow-y-auto custom-scrollbar' : 'bg-white text-gray-900 border-gray-300 max-h-[200px] overflow-y-auto custom-scrollbar'}>
+                    {state.filterSections.length === 0 ? (
+                      <div className="p-2 text-center text-sm text-muted-foreground">No sections available</div>
+                    ) : (
+                      state.filterSections.map((section) => (
+                        <SelectItem key={section.id} value={section.id} className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>
+                          Section {section.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {(state.filterSemesterId || state.filterSectionId) &&
+                <Button
+                  variant="ghost"
+                  onClick={() => updateState({ filterSemesterId: "", filterSectionId: "" })}
+                  className="bg-primary hover:bg-[#9147e0] text-white">
+                  
+                    Clear
+                  </Button>
+                }
+              </div>
+            </div>
+            {(() => {
+              if (state.loading) return <SkeletonTable rows={5} cols={5} />;
+              if (!state.filterSemesterId || !state.filterSectionId) return (
+                <div className={`flex flex-col items-center justify-center py-16 px-6 text-center border-2 border-dashed rounded-2xl transition-all duration-300 ${theme === 'dark' ? 'border-border bg-card/30 text-muted-foreground' : 'border-gray-200 bg-gray-50/50 text-gray-500'}`}>
+                  <div className={`p-5 rounded-full mb-5 ${theme === 'dark' ? 'bg-accent/20 text-primary' : 'bg-primary/10 text-primary'} animate-pulse`}>
+                    <Search className="w-10 h-10 opacity-80" />
+                  </div>
+                  <h3 className={`text-xl font-semibold mb-3 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Ready to View Assignments?</h3>
+                  <p className="max-w-md text-base leading-relaxed">
+                    Select a <span className="font-semibold text-primary">{translateTerminology("Semester").toLowerCase()}</span> and <span className="font-semibold text-primary">section</span> from the filters above to load the assignment list.
+                  </p>
+                </div>);
+
+              if (filteredAssignments.length === 0) {
+                const semObj = state.semesters.find((s) => s.id === state.filterSemesterId);
+                const semName = semObj ? getSemesterName(semObj.number) : '';
+                const secName = state.filterSections.find((s) => s.id === state.filterSectionId)?.name;
+                return (
+                  <div className={`flex flex-col items-center justify-center py-16 px-6 text-center border-2 border-dashed rounded-2xl transition-all duration-300 ${theme === 'dark' ? 'border-border bg-card/30 text-muted-foreground' : 'border-gray-200 bg-gray-50/50 text-gray-500'}`}>
+                    <div className={`p-5 rounded-full mb-5 ${theme === 'dark' ? 'bg-accent/20 text-primary' : 'bg-primary/10 text-primary'}`}>
+                      <Search className="w-10 h-10 opacity-80" />
+                    </div>
+                    <h3 className={`text-xl font-semibold mb-3 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>No Assignments Found</h3>
+                    <p className="max-w-md text-base leading-relaxed">
+                      There are no faculty assignments assigned to <span className="font-semibold text-primary">{semName}</span>, <span className="font-semibold text-primary">Section {secName || ''}</span>.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className={`rounded-md overflow-x-auto ${theme === 'dark' ? 'border-border' : 'border-gray-300'}`}>
+                  <table className="w-full text-sm scroll-smooth">
+                    <thead className={theme === 'dark' ? 'bg-card sticky top-0 z-10 border-border' : 'bg-gray-100 sticky top-0 z-10 border-gray-300'}>
+                      <tr className="border-b">
+                        <th className="text-left font-semibold p-2">Course</th>
+                        <th className="text-left font-semibold p-2">Section</th>
+                        <th className="text-left font-semibold p-2">{translateTerminology("Semester")}</th>
+                        <th className="text-left font-semibold p-2">Assigned Faculty</th>
+                        <th className="text-left font-semibold p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAssignments.map((assignment) =>
+                      <tr
+                        key={assignment.id}
+                        className={`border-b ${theme === 'dark' ? 'border-border hover:bg-accent' : 'border-gray-300 hover:bg-gray-100'}`}>
+                        
+                          <td className="p-2">{assignment.subject}</td>
+                          <td className="p-2">{assignment.section}</td>
+                          <td className="p-2">{getSemesterName(assignment.semester)}</td>
+                          <td className="p-2">
+                            {facultyMap[assignment.faculty_id]?.name || assignment.faculty}
+                            <div className={`text-xs ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+                              {facultyMap[assignment.faculty_id]?.email}
+                            </div>
+                          </td>
+                          <td className="p-2 flex items-center gap-2">
+                            <Button
+                            size="icon"
+                            variant="ghost"
+                            className={theme === 'dark' ? 'hover:bg-accent' : 'hover:bg-gray-200'}
+                            onClick={() => handleEdit(assignment)}
+                            disabled={state.loading || state.isAssigning}>
+                            
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                            size="icon"
+                            variant="ghost"
+                            className={theme === 'dark' ? 'hover:bg-accent' : 'hover:bg-gray-200'}
+                            onClick={() => handleDelete(assignment.id)}
+                            disabled={state.loading || state.isAssigning}>
+                            
+                              <Trash2 className={`h-4 w-4 ${theme === 'dark' ? 'text-destructive' : 'text-red-500'}`} />
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>);
+
+            })()}
+          </CardContent>
+          {state.assignmentsTotalPages > 1 && (
+            <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground px-6 py-4 border-t border-border mt-auto">
+              <div>
+                Page {state.assignmentsPage} of {state.assignmentsTotalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => updateState({ assignmentsPage: state.assignmentsPage - 1 })}
+                  disabled={state.assignmentsPage === 1}
+                  className="bg-primary hover:bg-primary/90 text-white border-primary h-9 px-4 transition-all"
+                >
+                  Previous
+                </Button>
+
+                <div className="flex items-center justify-center min-w-[2rem]">
+                  <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+                    {state.assignmentsPage}
+                  </span>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => updateState({ assignmentsPage: state.assignmentsPage + 1 })}
+                  disabled={state.assignmentsPage === state.assignmentsTotalPages}
+                  className="bg-primary hover:bg-primary/90 text-white border-primary h-9 px-4 transition-all"
+                >
+                  Next
+                </Button>
+              </div>
+            </CardFooter>
+          )}
+        </Card>
+
+      </div>
+    </ErrorBoundary>);
+
+};
+
+export default FacultyAssignments;

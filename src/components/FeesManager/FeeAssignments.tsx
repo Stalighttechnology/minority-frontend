@@ -1,0 +1,906 @@
+import { translateTerminology, getTerm } from "@/utils/institutionConfig";
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import {
+  UserCheck,
+  Users,
+  Search,
+  Plus,
+  AlertTriangle,
+  Calendar as CalendarIcon,
+  IndianRupee,
+  Filter,
+  ArrowRight,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  MousePointer2,
+  CheckCircle,
+  LayoutGrid
+} from
+  'lucide-react';
+import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "@/context/ThemeContext";
+import { showSuccessAlert, showErrorAlert, showInfoAlert } from "../../utils/sweetalert";
+import {
+  getFeesManagerFilters,
+  getFeesManagerSemesters,
+  getFeesManagerSections,
+  getFeesManagerStudents,
+  bulkAssignFees
+} from
+  "../../utils/fees_manager_api";
+import {
+  Skeleton,
+  SkeletonStatsGrid,
+  SkeletonTable,
+  SkeletonList,
+  SkeletonPageHeader,
+  SkeletonCard
+} from
+  "@/components/ui/skeleton";
+
+
+interface Student {
+  id: number;
+  name: string;
+  usn: string;
+  department: string;
+  semester: number;
+  section: string;
+  batch: string;
+  admission_mode: string;
+  assigned_templates?: any[];
+}
+
+interface FeeTemplate {
+  id: number;
+  name: string;
+  total_amount_cents?: number;
+  total_amount?: number;
+  fee_type: string;
+}
+
+interface FilterData {
+  batches: { id: number; name: string; }[];
+  branches: { id: number; name: string; code: string; }[];
+  admission_modes: string[];
+}
+
+const FeeAssignments: React.FC = () => {
+  const { theme } = useTheme();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Data States
+  const [filterData, setFilterData] = useState<FilterData>({ batches: [], branches: [], admission_modes: [] });
+  const [semesters, setSemesters] = useState<{ id: number; number: number; name: string; }[]>([]);
+  const [sections, setSections] = useState<{ id: number; name: string; }[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [templates, setTemplates] = useState<FeeTemplate[]>([]);
+
+  // Loading states for cascading filters
+  const [loadingInitialFilters, setLoadingInitialFilters] = useState(false);
+  const [loadingSemesters, setLoadingSemesters] = useState(false);
+  const [loadingSections, setLoadingSections] = useState(false);
+
+  // Selection States
+  const [selectedFilters, setSelectedFilters] = useState({
+    batchId: '',
+    branchId: '',
+    semesterId: '',
+    sectionId: '',
+    admissionMode: ''
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [academicYear, setAcademicYear] = useState('2024-25');
+  const [dueDate, setDueDate] = useState<string>('');
+
+  // UI States
+  const [openSelect, setOpenSelect] = useState<'batch' | 'branch' | 'semester' | 'section' | 'admission' | null>(null);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [viewTemplatesModalOpen, setViewTemplatesModalOpen] = useState(false);
+  const [studentToView, setStudentToView] = useState<Student | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    totalPages: 1,
+    totalCount: 0,
+    pageSize: 20
+  });
+
+  // Fetch initial filters
+  const fetchInitialFilters = useCallback(async () => {
+    try {
+      setLoadingInitialFilters(true);
+      const filterJson = await getFeesManagerFilters();
+
+      if (!filterJson.success) {
+        throw new Error('Failed to fetch initial data');
+      }
+
+      setFilterData(filterJson.data);
+      setTemplates(filterJson.data?.templates || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoadingInitialFilters(false);
+    }
+  }, []);
+
+  // Fetch semesters when branch changes
+  useEffect(() => {
+    if (!selectedFilters.branchId) {
+      setSemesters([]);
+      setSelectedFilters((prev) => ({ ...prev, semesterId: '', sectionId: '' }));
+      return;
+    }
+
+    const fetchSemesters = async () => {
+      try {
+        setLoadingSemesters(true);
+        const res = await getFeesManagerSemesters(selectedFilters.branchId);
+        if (res.success) {
+          setSemesters(res.data || []);
+        }
+      } catch (err) {
+
+      } finally {
+        setLoadingSemesters(false);
+      }
+    };
+    fetchSemesters();
+  }, [selectedFilters.branchId]);
+
+  // Fetch sections when semester changes
+  useEffect(() => {
+    if (!selectedFilters.semesterId || !selectedFilters.branchId) {
+      setSections([]);
+      setSelectedFilters((prev) => ({ ...prev, sectionId: '' }));
+      return;
+    }
+
+    const fetchSections = async () => {
+      try {
+        setLoadingSections(true);
+        const res = await getFeesManagerSections(selectedFilters.branchId, selectedFilters.semesterId);
+        if (res.success) {
+          setSections(res.data || []);
+        }
+      } catch (err) {
+
+      } finally {
+        setLoadingSections(false);
+      }
+    };
+    fetchSections();
+  }, [selectedFilters.semesterId, selectedFilters.branchId]);
+
+  // Fetch students based on filters
+  const fetchStudents = useCallback(async (page: number = 1) => {
+    try {
+      setLoading(true);
+      const params = {
+        page: page.toString(),
+        page_size: pagination.pageSize.toString(),
+        ...(selectedFilters.batchId && { batch_id: selectedFilters.batchId }),
+        ...(selectedFilters.branchId && { branch_id: selectedFilters.branchId }),
+        ...(selectedFilters.semesterId && { semester_id: selectedFilters.semesterId }),
+        ...(selectedFilters.sectionId && { section_id: selectedFilters.sectionId }),
+        ...(selectedFilters.admissionMode && { admission_mode: selectedFilters.admissionMode }),
+        ...(appliedSearch && { search: appliedSearch })
+      };
+
+      const json = await getFeesManagerStudents(params);
+
+      if (!json.success) throw new Error(json.message || 'Failed to fetch students');
+
+      setStudents(json.data.students || []);
+      setPagination((prev) => ({
+        ...prev,
+        page: json.data.meta.page,
+        totalPages: json.data.meta.total_pages,
+        totalCount: json.data.meta.count
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error loading students');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedFilters, appliedSearch, pagination.pageSize]);
+
+  useEffect(() => {
+    fetchInitialFilters();
+  }, [fetchInitialFilters]);
+
+  // Auto-resolve academic year based on selected batch/semester or selected students
+  useEffect(() => {
+    // 1. Try resolving from selected students first
+    if (selectedStudentIds.size > 0) {
+      const firstId = Array.from(selectedStudentIds)[0];
+      const firstSelectedStudent = students.find(s => String(s.id) === String(firstId));
+      if (firstSelectedStudent && firstSelectedStudent.batch) {
+        setAcademicYear(firstSelectedStudent.batch);
+        return;
+      }
+    }
+
+    // 2. Fall back to resolving from selected dropdown filters
+    if (selectedFilters.batchId) {
+      const selectedBatch = filterData.batches.find(b => b.id.toString() === selectedFilters.batchId);
+      if (selectedBatch) {
+        setAcademicYear(selectedBatch.name);
+      }
+    }
+  }, [selectedFilters.batchId, filterData.batches, selectedStudentIds, students]);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(searchQuery.trim());
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Clear search query when dropdown filters change
+  useEffect(() => {
+    setSearchQuery("");
+    setAppliedSearch("");
+  }, [
+    selectedFilters.batchId,
+    selectedFilters.branchId,
+    selectedFilters.semesterId,
+    selectedFilters.sectionId,
+    selectedFilters.admissionMode
+  ]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const allFiltersSelected =
+        selectedFilters.batchId &&
+        selectedFilters.branchId &&
+        selectedFilters.semesterId &&
+        selectedFilters.sectionId &&
+        selectedFilters.admissionMode;
+
+      if (allFiltersSelected || appliedSearch.trim().length > 0) {
+        fetchStudents(1);
+      } else {
+        setStudents([]);
+        setPagination((prev) => ({ ...prev, totalCount: 0 }));
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [
+    selectedFilters.batchId,
+    selectedFilters.branchId,
+    selectedFilters.semesterId,
+    selectedFilters.sectionId,
+    selectedFilters.admissionMode,
+    appliedSearch,
+    fetchStudents
+  ]);
+
+  const allFiltersSelected =
+    selectedFilters.batchId &&
+    selectedFilters.branchId &&
+    selectedFilters.semesterId &&
+    selectedFilters.sectionId &&
+    selectedFilters.admissionMode;
+
+  // Handlers
+  const toggleStudentSelection = (id: number) => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else
+        next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedStudentIds.size === students.length) {
+      setSelectedStudentIds(new Set());
+    } else {
+      setSelectedStudentIds(new Set(students.map((s) => s.id)));
+    }
+  };
+
+  const handleAssign = async () => {
+    if (selectedStudentIds.size === 0 || !selectedTemplateId) return;
+    if (!dueDate) {
+      showErrorAlert('Missing Due Date', 'Please select a due date for the invoice.');
+      return;
+    }
+
+    setIsConfirming(true);
+    try {
+      const result = await bulkAssignFees({
+        student_ids: Array.from(selectedStudentIds),
+        template_id: parseInt(selectedTemplateId),
+        academic_year: academicYear,
+        due_date: dueDate
+      });
+
+      if (!result.success) {
+        throw new Error(result.message || 'Bulk assignment failed');
+      }
+
+      setIsAssignDialogOpen(false);
+
+      // Selective Optimistic Update: Only update students who weren't skipped by the backend
+      const assignedTemplate = templates.find((t) => t.id.toString() === selectedTemplateId);
+      const skippedIds = new Set(result.data?.skipped_student_ids || result.skipped_student_ids || []);
+
+      if (assignedTemplate) {
+        setStudents((prev) => prev.map((student) => {
+          if (selectedStudentIds.has(student.id) && !skippedIds.has(student.id)) {
+            const currentTemplates = (student as any).assigned_templates || [];
+            if (!currentTemplates.some((t: any) => t.id === assignedTemplate.id)) {
+              return {
+                ...student,
+                assigned_templates: [...currentTemplates, {
+                  id: assignedTemplate.id,
+                  template_name: assignedTemplate.name
+                }]
+              };
+            }
+          }
+          return student;
+        }));
+      }
+
+      setSelectedStudentIds(new Set());
+      setSelectedTemplateId('');
+
+      if ((result.data?.created_count !== undefined ? result.data.created_count : result.created_count) > 0) {
+        showSuccessAlert('Success!', result.message || 'Fee templates assigned successfully!');
+      } else {
+        showInfoAlert('No Changes Made', result.message || 'All selected students already have an assignment for this year.');
+      }
+    } catch (err) {
+      showErrorAlert('Error', err instanceof Error ? err.message : 'Assignment failed');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const formatCurrency = (centsOrAmount: any) => {
+    const amount = Number(centsOrAmount) / (Number.isInteger(centsOrAmount) ? 100 : 1);
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR'
+    }).format(amount || 0);
+  };
+
+  return (
+    <div id="feesmanager-assignments-container">
+      <Card className="border-border/50 shadow-sm overflow-hidden">
+        <div id="feesmanager-assignments-filters">
+          <CardHeader className="border-b bg-muted/10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <CardTitle>Fee Assignments</CardTitle>
+                <p className="text-muted-foreground mt-1">Structured student selection and bulk fee template assignment</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="px-3 py-1 font-medium h-9">
+                  {pagination.totalCount} Students Found
+                </Badge>
+                <Button
+                  disabled={selectedStudentIds.size === 0}
+                  onClick={() => setIsAssignDialogOpen(true)}
+                  className="bg-primary text-white hover:bg-primary/90 shadow-md transition-all active:scale-95 h-9">
+
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Assign ({selectedStudentIds.size})
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <div className="p-6 pb-0">
+            {/* Filters Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">Batch</Label>
+                <Select
+                  value={selectedFilters.batchId}
+                  open={openSelect === 'batch'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'batch' : null)}
+                  onValueChange={(val) => {
+                    setSelectedFilters((p) => ({ ...p, batchId: val }));
+                    setTimeout(() => setOpenSelect('branch'), 100);
+                  }}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select Batch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingInitialFilters ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        Loading batches...
+                      </SelectItem>
+                    ) : filterData.batches.length > 0 ? (
+                      filterData.batches.map((b) => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)
+                    ) : (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        No batches found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">{translateTerminology("Branch")}</Label>
+                <Select
+                  value={selectedFilters.branchId}
+                  open={openSelect === 'branch'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'branch' : null)}
+                  onValueChange={(val) => {
+                    setSelectedFilters((p) => ({ ...p, branchId: val }));
+                    setTimeout(() => setOpenSelect('semester'), 100);
+                  }}
+                  disabled={!selectedFilters.batchId}>
+
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder={translateTerminology("Select Branch")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingInitialFilters ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        Loading branches...
+                      </SelectItem>
+                    ) : filterData.branches.length > 0 ? (
+                      filterData.branches.map((b) => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)
+                    ) : (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        No branches found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">{translateTerminology("Semester")}</Label>
+                <Select
+                  value={selectedFilters.semesterId}
+                  open={openSelect === 'semester'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'semester' : null)}
+                  onValueChange={(val) => {
+                    setSelectedFilters((p) => ({ ...p, semesterId: val }));
+                    setTimeout(() => setOpenSelect('section'), 100);
+                  }}
+                  disabled={!selectedFilters.branchId}>
+
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder={translateTerminology("Select Semester")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingSemesters ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        Loading semesters...
+                      </SelectItem>
+                    ) : semesters.length > 0 ? (
+                      semesters.map((s) => <SelectItem key={s.id} value={s.id.toString()}>{translateTerminology(s.name)}</SelectItem>)
+                    ) : (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        No semesters found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">Section</Label>
+                <Select
+                  value={selectedFilters.sectionId}
+                  open={openSelect === 'section'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'section' : null)}
+                  onValueChange={(val) => {
+                    setSelectedFilters((p) => ({ ...p, sectionId: val }));
+                    setTimeout(() => setOpenSelect('admission'), 100);
+                  }}
+                  disabled={!selectedFilters.semesterId}>
+
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select Section" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {loadingSections ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        Loading sections...
+                      </SelectItem>
+                    ) : sections.length > 0 ? (
+                      sections.map((s) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)
+                    ) : (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        No sections found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">Admission Mode</Label>
+                <Select
+                  value={selectedFilters.admissionMode}
+                  open={openSelect === 'admission'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'admission' : null)}
+                  onValueChange={(val) => {
+                    setSelectedFilters((p) => ({ ...p, admissionMode: val }));
+                    setOpenSelect(null);
+                  }}
+                  disabled={!selectedFilters.sectionId}>
+
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select Admission Mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingInitialFilters ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        Loading admission modes...
+                      </SelectItem>
+                    ) : filterData.admission_modes.length > 0 ? (
+                      filterData.admission_modes.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)
+                    ) : (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        No admission modes found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Search Row */}
+            <div className="mb-6">
+              <div className="relative max-w-md w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by USN or Name..."
+                  className="pl-9 pr-12 bg-muted/20 border-border h-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)} />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <CardContent className="p-6 pt-0">
+          <div className="border rounded-xl overflow-hidden shadow-sm">
+            {!allFiltersSelected && !appliedSearch ? (
+              <div className="min-h-[400px] py-10 flex flex-col items-center justify-center bg-muted/5 px-4 text-center">
+                <div className="relative mb-6">
+                  <div className="absolute -top-3 -right-3 bg-primary/10 p-2 rounded-full animate-bounce sm:-top-4 sm:-right-4 sm:p-3">
+                    <MousePointer2 className="h-3 w-3 text-primary sm:h-4 sm:w-4" />
+                  </div>
+                  <div className="bg-muted/20 p-6 rounded-2xl border-2 border-dashed border-muted sm:p-8">
+                    <Filter className="h-6 w-6 text-muted-foreground/30 sm:h-8 sm:w-8" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-bold text-foreground mb-2">Selection Required</h3>
+                <p className="text-muted-foreground max-w-sm mb-8 text-sm px-2">
+                  Please complete the cascading filter selection above to load the student directory.
+                </p>
+                <div className="flex flex-wrap justify-center gap-4 sm:gap-6 w-full max-w-3xl">
+                  {[
+                    { label: 'Batch', active: !!selectedFilters.batchId },
+                    { label: translateTerminology("Branch"), active: !!selectedFilters.branchId },
+                    { label: translateTerminology("Semester"), active: !!selectedFilters.semesterId },
+                    { label: 'Section', active: !!selectedFilters.sectionId },
+                    { label: 'Admission', active: !!selectedFilters.admissionMode }
+                  ].map((step, i) => (
+                    <div key={step.label} className="flex flex-col items-center gap-2 min-w-[60px] sm:min-w-[80px]">
+                      <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold border-2 transition-all duration-300 ${step.active
+                        ? 'bg-primary border-primary text-white shadow-lg shadow-primary/25 scale-110'
+                        : 'bg-background border-muted text-muted-foreground opacity-60'
+                        }`}>
+                        {step.active ? <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" /> : i + 1}
+                      </div>
+                      <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-colors duration-300 ${step.active ? 'text-primary' : 'text-muted-foreground opacity-60'
+                        }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : loading ? (
+              <div className="overflow-x-auto">
+                <SkeletonTable rows={10} cols={6} />
+              </div>
+            ) : students.length === 0 ? (
+              <div className="h-[450px] flex flex-col items-center justify-center text-muted-foreground italic px-6 text-center bg-muted/5">
+                <Users className="h-16 w-16 mb-4 opacity-10" />
+                <h3 className="text-lg font-semibold text-foreground not-italic mb-1">No Students Found</h3>
+                <p className="text-sm text-muted-foreground">Try adjusting your filters to find what you're looking for.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[50px] text-center">
+                        <Checkbox
+                          checked={selectedStudentIds.size === students.length && students.length > 0}
+                          onCheckedChange={toggleSelectAll} />
+
+                      </TableHead>
+                      <TableHead className="font-semibold py-4">Student Details</TableHead>
+                      <TableHead className="font-semibold">USN</TableHead>
+                      <TableHead className="font-semibold">Placement</TableHead>
+                      <TableHead className="font-semibold">Assigned Fee</TableHead>
+                      <TableHead className="font-semibold">Adm. Mode</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.map((student) =>
+                      <TableRow
+                        key={student.id}
+                        className={`cursor-pointer transition-all duration-200 border-b border-border/50 ${selectedStudentIds.has(student.id) ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-muted/30'}`}
+                        onClick={() => toggleStudentSelection(student.id)}>
+
+                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedStudentIds.has(student.id)}
+                            onCheckedChange={() => toggleStudentSelection(student.id)} />
+
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="font-semibold text-foreground">{student.name}</div>
+                          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-tight">{student.batch}</div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm font-medium">{student.usn}</TableCell>
+                        <TableCell>
+                          <div className="text-sm font-medium">{student.department}</div>
+                          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-tight">Sem {student.semester} • Sec {student.section}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {student.assigned_templates && student.assigned_templates.length > 0 ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-7 px-3"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setStudentToView(student);
+                                  setViewTemplatesModalOpen(true);
+                                }}
+                              >
+                                View ({student.assigned_templates.length})
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">None</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[12px] uppercase font-semibold tracking-widest px-2 border-border/50">
+                            {student.admission_mode}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </CardContent>
+        {pagination.totalPages > 1 && (
+          <CardFooter className="py-4 bg-muted/5 flex flex-col sm:flex-row items-center justify-between border-t px-6 gap-4">
+            <div className={`text-sm ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+              Showing {pagination.totalCount > 0 ? (pagination.page - 1) * pagination.pageSize + 1 : 0} to {Math.min(pagination.page * pagination.pageSize, pagination.totalCount)} of {pagination.totalCount} students
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchStudents(pagination.page - 1)}
+                disabled={pagination.page === 1 || loading}
+                className="text-white bg-primary border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white px-3 py-1 h-9">
+
+                Previous
+              </Button>
+
+              <div className="flex items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  className={`${theme === 'dark' ? 'text-muted-foreground bg-card border border-border' : 'text-gray-700 bg-white border border-gray-300'} px-3 py-1 h-9 min-w-[36px]`}>
+
+                  {pagination.page}
+                </Button>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchStudents(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages || loading}
+                className="text-white bg-primary border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white px-3 py-1 h-9">
+
+                Next
+              </Button>
+            </div>
+          </CardFooter>
+        )}
+      </Card>
+
+      {/* Assignment Dialog remains the same */}
+      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+        <DialogContent className="w-[90vw] sm:max-w-[500px] rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Assign Fee Template</DialogTitle>
+            <DialogDescription>
+              Assign a fee template to the {selectedStudentIds.size} selected students.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Academic Year</Label>
+              <Input
+                value={academicYear}
+                onChange={(e) => setAcademicYear(e.target.value)}
+                placeholder="e.g., 2024-25" />
+
+            </div>
+
+            <div className="space-y-2">
+              <Label>Select Template</Label>
+              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a fee template" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((t) =>
+                    <SelectItem key={t.id} value={t.id.toString()}>
+                      {t.name} ({formatCurrency(t.total_amount_cents || t.total_amount)})
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Due Date <span className="text-red-500">*</span></Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal mt-1",
+                      !dueDate && "text-muted-foreground",
+                      theme === 'dark' ? 'bg-background border-border hover:bg-muted' : 'bg-white border-gray-300 hover:bg-gray-50'
+                    )}>
+                    
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dueDate ? format(new Date(dueDate), "PPP") : <span>Pick a due date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dueDate ? new Date(dueDate) : undefined}
+                    onSelect={(date) => setDueDate(date ? format(date, "yyyy-MM-dd") : '')}
+                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                    initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {selectedTemplateId &&
+              <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 mt-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-full text-primary">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">Summary</div>
+                    <div className="text-xs text-muted-foreground">
+                      Template: {templates.find((t) => t.id.toString() === selectedTemplateId)?.name}<br />
+                      Amount: {formatCurrency(templates.find((t) => t.id.toString() === selectedTemplateId)?.total_amount_cents || templates.find((t) => t.id.toString() === selectedTemplateId)?.total_amount)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>Cancel</Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  disabled={!selectedTemplateId || !dueDate || isConfirming}
+                  className="bg-primary text-white">
+                  {isConfirming ? "Processing..." : "Confirm & Assign"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirm Assignment</AlertDialogTitle>
+                  <AlertDialogDescription className="leading-relaxed flex flex-col gap-4 mt-2">
+                    <span className="text-sm">Are you sure you want to assign this fee template?</span>
+                    <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 rounded-lg text-sm text-left">
+                      <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="font-semibold text-amber-900 dark:text-amber-200">Note:</strong> If you want to change or delete this assignment later, you must visit the individual student's fees page and delete the invoice <strong>before</strong> the student makes a payment.
+                      </div>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleAssign} className="bg-primary text-white">
+                    Confirm Assignment
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Assigned Templates Modal */}
+      <Dialog open={viewTemplatesModalOpen} onOpenChange={setViewTemplatesModalOpen}>
+        <DialogContent className="w-[90%] max-w-[90%] sm:max-w-md rounded-2xl p-4 sm:p-6 h-[80vh] sm:h-auto max-h-[80vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-xl">Assigned Fees</DialogTitle>
+            <DialogDescription className="text-sm">
+              Fees assigned to {studentToView?.name} ({studentToView?.usn}).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 overflow-y-auto flex-1 py-2 my-2 scrollbar-thin pr-1">
+            {studentToView?.assigned_templates && studentToView.assigned_templates.length > 0 ? (
+              studentToView.assigned_templates.map((at: any) => (
+                <div key={at.id} className="flex justify-between items-center p-3 sm:p-4 border border-border/60 rounded-xl bg-card shadow-sm">
+                  <span className="font-semibold text-sm sm:text-base">{at.template_name}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-center text-muted-foreground p-6 bg-muted/10 rounded-xl border border-dashed">No fees assigned.</div>
+            )}
+          </div>
+          <DialogFooter className="mt-2 sm:mt-0 shrink-0">
+            <Button className="w-full sm:w-auto font-medium bg-primary hover:bg-primary/90 text-white" onClick={() => setViewTemplatesModalOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default FeeAssignments;

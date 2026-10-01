@@ -1,0 +1,589 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence, Variants } from "framer-motion";
+import {
+  Check,
+  ArrowRight,
+  Zap,
+  Shield,
+  Crown,
+  ChevronDown,
+  Star,
+  Sparkles,
+  Sliders,
+  Info,
+  X,
+  MessageCircle
+} from "lucide-react";
+
+// --- Premium Animation Variants ---
+const staggerContainer: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
+};
+
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
+};
+
+const Pricing = () => {
+  const navigate = useNavigate();
+  const [activeFAQ, setActiveFAQ] = useState<number | null>(null);
+  const [isTrialPopupOpen, setIsTrialPopupOpen] = useState(false);
+  const [activeCompareTab, setActiveCompareTab] = useState<'basic' | 'pro' | 'advance' | 'custom'>('basic');
+  const tableContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToColumn = (plan: 'basic' | 'pro' | 'advance' | 'custom') => {
+    setActiveCompareTab(plan);
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const scrollWidth = container.scrollWidth;
+    const clientWidth = container.clientWidth;
+    if (scrollWidth > clientWidth) {
+      if (plan === 'basic') {
+        container.scrollTo({ left: 0, behavior: 'smooth' });
+      } else if (plan === 'pro') {
+        container.scrollTo({ left: (scrollWidth - clientWidth) * 0.33, behavior: 'smooth' });
+      } else if (plan === 'advance') {
+        container.scrollTo({ left: (scrollWidth - clientWidth) * 0.66, behavior: 'smooth' });
+      } else if (plan === 'custom') {
+        container.scrollTo({ left: scrollWidth - clientWidth, behavior: 'smooth' });
+      }
+    }
+  };
+
+  const basicPrice = "₹150";
+  const proPrice = "₹200";
+  const advancePrice = "₹250";
+
+  const handleGetStarted = (link: string) => {
+    navigate(link);
+  };
+
+  // Removed window.scrollTo to prevent jumping
+
+  const plans = [
+    {
+      name: "Basic",
+      price: basicPrice,
+      duration: "per student / year",
+      description: "Essential for daily campus operations with core administrative and academic tools.",
+      tagline: "Start your journey",
+      features: [
+        "Dashboards & Profiles",
+        "Timetables & Syllabus Tracking",
+        "Real-time Attendance",
+        "Basic Announcements",
+        "Organization & Staff Enrollment",
+        "Core Billing & Plans"
+      ],
+      icon: <Zap className="text-blue-500" size={24} />,
+      iconBg: "bg-blue-50",
+      accent: "blue",
+      link: "/stalightcampus/basic",
+      popular: false
+    },
+    {
+      name: "Pro",
+      price: proPrice,
+      duration: "per student / year",
+      description: "For scaling institutions with enhanced workflows and deep analytics.",
+      tagline: "Elevate your campus",
+      features: [
+        "Complete Exam Suite & Results",
+        "Student Marks & Study Materials",
+        "Full Fee & Finance Management",
+        "Class Scheduling & Assignments",
+        "Leave Management Workflows",
+        "Automated Faculty Bulk Uploads",
+        "Dedicated COE & Fees Roles",
+        "Everything in Basic +"
+      ],
+      icon: <Shield className="text-purple-600" size={24} />,
+      iconBg: "bg-purple-100",
+      accent: "purple",
+      link: "/stalightcampus/pro",
+      popular: true
+    },
+    {
+      name: "Advance",
+      price: advancePrice,
+      duration: "per student / year",
+      description: "Enterprise-grade capabilities with state-of-the-art intelligence and security.",
+      tagline: "The future of education",
+      features: [
+        "Hostel Management System (HMS)",
+        "Comprehensive Transport System",
+        "Full Library Administration",
+        "Admissions Management",
+        "Outcome Based Education (CO)",
+        "Department Admin Leaves",
+        "Everything in Pro +"
+      ],
+      icon: <Crown className="text-amber-500" size={24} />,
+      iconBg: "bg-amber-50",
+      accent: "amber",
+      link: "/stalightcampus/advance",
+      popular: false
+    },
+    {
+      name: "Custom",
+      price: "Custom",
+      duration: "tailored pricing",
+      description: "For institutions requiring specialized workflows, custom integrations, and dedicated hosting.",
+      tagline: "Build your perfect system",
+      features: [
+        "Custom ERP Modules & Workflows",
+        "Institution-Specific Features",
+        "Custom Roles & Permissions",
+        "Dedicated Database & Hosting",
+        "24/7 Priority Support & SLA",
+        "Everything in Advance +"
+      ],
+      icon: <Sliders className="text-pink-500" size={24} />,
+      iconBg: "bg-pink-50",
+      accent: "pink",
+      link: "mailto:sales@stalight.in",
+      popular: false
+    }
+  ];
+
+  const comparisonFeatures = [
+    { name: "Dashboards, Timetables & Profiles", basic: true, pro: true, advance: true, custom: true },
+    { name: "Attendance (Student, Faculty, HOD)", basic: true, pro: true, advance: true, custom: true },
+    { name: "Organization, Staff & Branch Setup", basic: true, pro: true, advance: true, custom: true },
+    { name: "Internal Marks & Assignments", basic: false, pro: true, advance: true, custom: true },
+    { name: "Class Scheduling & Study Materials", basic: false, pro: true, advance: true, custom: true },
+    { name: "Comprehensive Exam & Results Suite", basic: false, pro: true, advance: true, custom: true },
+    { name: "Fee Management, Invoices & Payments", basic: false, pro: true, advance: true, custom: true },
+    { name: "Leave Management & Bulk Uploads", basic: false, pro: true, advance: true, custom: true },
+    { name: "Hostel Management System (HMS)", basic: false, pro: false, advance: true, custom: true },
+    { name: "Transportation & Fleet Tracking", basic: false, pro: false, advance: true, custom: true },
+    { name: "Library Catalog & Circulation", basic: false, pro: false, advance: true, custom: true },
+    { name: "Admissions & Seat Matrix Management", basic: false, pro: false, advance: true, custom: true },
+    { name: "Outcome Based Education (CO Attainment)", basic: false, pro: false, advance: true, custom: true },
+    { name: "Custom ERP Modules & Workflows", basic: false, pro: false, advance: false, custom: true },
+    { name: "Institution-Specific Features", basic: false, pro: false, advance: false, custom: true },
+    { name: "Custom Roles & Permissions", basic: false, pro: false, advance: false, custom: true }
+  ];
+
+  const faqs = [
+    {
+      question: "Can I upgrade or downgrade my plan anytime?",
+      answer: "Yes, you can change your plan at any time. If you upgrade, the new features will be available immediately and the prorated cost will be added to your next billing cycle. Downgrades take effect at the end of your current billing period."
+    },
+    {
+      question: "Do you offer custom plans for enterprise institutions?",
+      answer: "Absolutely. For large universities or multi-campus institutions with unique requirements, we offer custom enterprise pricing and tailored implementation packages. Contact our sales team for a personalized quote."
+    },
+    {
+      question: "What payment methods do you accept?",
+      answer: "We accept all major credit/debit cards, net banking, UPI, and bank transfers (NEFT/RTGS). For annual Advance plans, we also offer invoice-based billing."
+    },
+    {
+      question: "Is there a minimum contract length?",
+      answer: "While we recommend annual plans for the best value (and stability for your institution), we do offer flexible commitment options. Most of our institutional clients prefer the annual advance payment for budgeting predictability."
+    },
+    {
+      question: "Do you provide training and support?",
+      answer: "Yes! Every plan includes full onboarding support. Pro and Advance plans also include dedicated account managers and priority 24/7 technical support with defined SLAs."
+    },
+    {
+      question: "What about data security and compliance?",
+      answer: "Data security is our top priority. Stalight Campus is ISO 27001 certified and GDPR compliant. We use enterprise-grade encryption (AES-256) and host all data on secure, redundant cloud infrastructure with regular backups."
+    }
+  ];
+
+  return (
+    <div className="h-screen bg-[#FAFAFA] text-slate-900 font-sans selection:bg-purple-100 selection:text-purple-900 overflow-y-auto overflow-x-hidden relative scroll-smooth thin-scrollbar">
+
+      {/* --- FLOATING HEADER --- */}
+      <header className="absolute top-0 left-0 w-full z-50 px-6 py-6 md:px-12 flex items-center justify-between pointer-events-auto">
+        <div className="flex items-center gap-3">
+          <img src="/applogo.png" alt="Stalight Campus Logo" className="w-10 h-10 rounded-full object-cover shadow-md border border-white/20" />
+          <div className="flex flex-col">
+            <span className="font-bold text-lg md:text-xl text-slate-900 tracking-tight leading-none mb-1">Stalight Campus</span>
+            <span className="text-[9px] md:text-[10px] font-semibold text-purple-600 uppercase tracking-widest leading-none">Stalight Technologies Pvt Ltd</span>
+          </div>
+        </div>
+      </header>
+
+      {/* --- AMBIENT BACKGROUND GLOWS --- */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        {/* Curved Top Background */}
+        <div className="absolute top-0 left-0 w-full overflow-hidden leading-none z-0">
+          <svg viewBox="0 0 1440 320" preserveAspectRatio="none" className="relative block w-full h-[240px] sm:h-[300px] md:h-[360px] lg:h-[420px]">
+            {/* Wave 1 (Bottom, deeper lavender) */}
+            <path d="M0,0 L1440,0 L1440,240 C1150,300 850,180 570,260 C290,340 140,200 0,260 Z" fill="#E2D9FF" opacity="0.65"></path>
+            {/* Wave 2 (Top, lighter lavender) */}
+            <path d="M0,0 L1440,0 L1440,180 C1100,240 800,140 520,210 C240,280 110,180 0,210 Z" fill="#F0EBFF" opacity="0.9"></path>
+          </svg>
+        </div>
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-pink-500/10 rounded-full blur-[120px]"></div>
+        <div className="absolute top-[20%] right-[-10%] w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[150px]"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px] opacity-50"></div>
+      </div>
+
+      {/* --- HERO SECTION --- */}
+      <section className="relative pt-32 pb-16 z-10 w-full text-center px-4">
+        <motion.div initial="hidden" animate="visible" variants={staggerContainer} className="max-w-4xl mx-auto flex flex-col items-center">
+          
+          <motion.div variants={fadeUp} className="inline-flex items-center px-4 py-1.5 rounded-full bg-purple-100/80 text-purple-700 text-xs font-semibold uppercase tracking-wider mb-6 shadow-sm border border-purple-200/50 backdrop-blur-sm">
+            Pricing & Plans
+          </motion.div>
+
+          <motion.h1 variants={fadeUp} className="text-5xl md:text-7xl font-light tracking-tighter mb-6 leading-[1.1]">
+            Scale seamlessly with <br />
+            <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500">Enterprise Intelligence.</span>
+          </motion.h1>
+
+          <motion.p variants={fadeUp} className="text-slate-600 text-lg md:text-xl max-w-2xl mx-auto mb-10 font-light">
+            Choose the perfect plan for your institution's needs. Scale from essential daily operations to state-of-the-art AI capabilities.
+          </motion.p>
+        </motion.div>
+      </section>
+
+      {/* --- PRICING CARDS --- */}
+      <section className="relative z-10 pb-24 px-4">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={staggerContainer}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch"
+          >
+            {plans.map((plan) => (
+              <motion.div
+                key={plan.name}
+                variants={fadeUp}
+                className={`relative flex flex-col p-8 md:p-10 rounded-[2.5rem] bg-white border transition-all duration-500 hover:-translate-y-2 h-full ${plan.popular
+                  ? 'border-purple-200 shadow-[0_20px_60px_-15px_rgba(168,85,247,0.2)] md:scale-105 z-10'
+                  : 'border-slate-200 shadow-xl shadow-slate-200/50 hover:shadow-2xl'
+                  }`}
+              >
+                {/* Popular Badge */}
+                {plan.popular && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-600 text-white px-6 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg">
+                    Recommended
+                  </div>
+                )}
+
+                {/* Header */}
+                <div className="mb-8 border-b border-slate-100 pb-8">
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-sm ${plan.iconBg}`}>
+                    {plan.icon}
+                  </div>
+                  <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">{plan.name}</h3>
+                  <p className="text-slate-500 text-sm font-medium mb-6">{plan.tagline}</p>
+
+                  <div className="flex items-baseline gap-1.5 flex-wrap">
+                    <span className="text-3xl sm:text-4xl lg:text-3xl xl:text-5xl font-black text-slate-900 tracking-tighter whitespace-nowrap">{plan.price}</span>
+                    <span className="text-slate-400 font-medium text-xs lg:text-[10px] xl:text-sm whitespace-nowrap">{plan.duration}</span>
+                  </div>
+                </div>
+
+                {/* Description & Features */}
+                <div className="flex-grow flex flex-col">
+                  <p className="text-slate-600 text-sm leading-relaxed mb-8">{plan.description}</p>
+
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">What's Included</p>
+                  <ul className="space-y-4 mb-10 flex-grow">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className="flex items-start gap-3">
+                        <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${plan.popular ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                          <Check size={12} strokeWidth={3} />
+                        </div>
+                        <span className={`text-sm leading-tight ${feature.includes('Everything in') ? 'font-bold text-slate-900' : 'text-slate-600 font-medium'}`}>
+                          {feature}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Action Button */}
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); handleGetStarted(plan.link); }}
+                  className={`w-full py-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 group ${plan.popular
+                    ? 'bg-gradient-to-r from-pink-500 via-purple-500 to-blue-600 text-white shadow-lg hover:shadow-xl hover:opacity-95'
+                    : 'bg-slate-900 hover:bg-slate-800 text-white shadow-md'
+                    }`}
+                >
+                  Get Started
+                  <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                </button>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* --- COMPARISON TABLE --- */}
+      <section className="relative z-10 py-24 px-4 bg-white border-y border-slate-100">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight">Feature Comparison</h2>
+            <p className="text-slate-500 text-lg font-light">See exactly what each plan includes and find the perfect fit.</p>
+          </div>
+
+          {/* Mobile plan selector tabs */}
+          <div className="md:hidden flex p-1.5 bg-slate-100/80 backdrop-blur-md rounded-2xl mb-6 mx-auto max-w-sm border border-slate-200/50">
+            <button
+              onClick={() => scrollToColumn('basic')}
+              className={`flex-1 py-3 text-center rounded-xl text-sm font-bold transition-all duration-300 ${
+                activeCompareTab === 'basic'
+                  ? 'bg-white text-blue-600 shadow-md shadow-blue-500/5'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Basic
+            </button>
+            <button
+              onClick={() => scrollToColumn('pro')}
+              className={`flex-1 py-3 text-center rounded-xl text-sm font-bold transition-all duration-300 ${
+                activeCompareTab === 'pro'
+                  ? 'bg-white text-purple-600 shadow-md shadow-purple-500/5'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Pro
+            </button>
+            <button
+              onClick={() => scrollToColumn('advance')}
+              className={`flex-1 py-3 text-center rounded-xl text-sm font-bold transition-all duration-300 ${
+                activeCompareTab === 'advance'
+                  ? 'bg-white text-amber-600 shadow-md shadow-amber-500/5'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Advance
+            </button>
+            <button
+              onClick={() => scrollToColumn('custom')}
+              className={`flex-1 py-3 text-center rounded-xl text-sm font-bold transition-all duration-300 ${
+                activeCompareTab === 'custom'
+                  ? 'bg-white text-pink-600 shadow-md shadow-pink-500/5'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Custom
+            </button>
+          </div>
+
+          <div className="overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white shadow-xl shadow-slate-200/40">
+            <div ref={tableContainerRef} className="overflow-x-auto md:overflow-x-visible scroll-smooth">
+              <table className="w-full text-left border-collapse min-w-0 md:min-w-[800px] table-fixed md:table-auto">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200">
+                    <th className="py-6 px-3 md:py-8 md:px-8 text-[12px] md:text-xs font-bold text-slate-500 uppercase tracking-wider w-[32%] md:w-[32%] break-words whitespace-normal">Core Capabilities</th>
+                    <th className={`py-6 px-2 md:py-8 md:px-4 text-center w-[17%] transition-all duration-300 ${activeCompareTab === 'basic' ? 'bg-blue-50/40' : ''}`}>
+                      <div className="text-slate-900 font-black text-sm md:text-xl">Basic</div>
+                    </th>
+                    <th className={`py-6 px-2 md:py-8 md:px-4 text-center w-[17%] relative transition-all duration-300 ${activeCompareTab === 'pro' ? 'bg-purple-50/60' : ''}`}>
+                      {/* Highlight column indicator */}
+                      <div className="absolute inset-0 bg-purple-50/30 border-x border-purple-100/30 -z-10"></div>
+                      <div className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600 font-black text-sm md:text-xl">Pro</div>
+                    </th>
+                    <th className={`py-6 px-2 md:py-8 md:px-4 text-center w-[17%] transition-all duration-300 ${activeCompareTab === 'advance' ? 'bg-amber-50/40' : ''}`}>
+                      <div className="text-slate-900 font-black text-sm md:text-xl">Advance</div>
+                    </th>
+                    <th className={`py-6 px-2 md:py-8 md:px-4 text-center w-[17%] transition-all duration-300 ${activeCompareTab === 'custom' ? 'bg-pink-50/40' : ''}`}>
+                      <div className="text-slate-900 font-black text-sm md:text-xl">Custom</div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {comparisonFeatures.map((row, i) => (
+                    <tr key={i} className="group hover:bg-slate-50/50 transition-colors">
+                      <td className="py-4 px-3 md:py-5 md:px-8 text-slate-700 font-medium text-xs md:text-sm break-words whitespace-normal w-[32%]">
+                        <div className="flex items-center gap-1 md:gap-2 flex-wrap md:flex-nowrap">
+                          <span>{row.name}</span>
+                          {i > 5 && <Info size={12} className="text-slate-400 cursor-help shrink-0" />}
+                        </div>
+                      </td>
+                      <td className={`py-4 px-2 md:py-5 md:px-4 text-center w-[17%] transition-all duration-300 ${activeCompareTab === 'basic' ? 'bg-blue-50/20' : ''}`}>
+                        {row.basic ? <Check size={18} className="text-blue-500 mx-auto md:w-5 md:h-5" /> : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className={`py-4 px-2 md:py-5 md:px-4 text-center relative w-[17%] transition-all duration-300 ${activeCompareTab === 'pro' ? 'bg-purple-50/30' : ''}`}>
+                        <div className="absolute inset-0 bg-purple-50/20 border-x border-purple-100/20 -z-10 group-hover:bg-purple-50/30 transition-colors"></div>
+                        {row.pro ? <Check size={18} className="text-purple-600 mx-auto md:w-5 md:h-5" /> : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className={`py-4 px-2 md:py-5 md:px-4 text-center w-[17%] transition-all duration-300 ${activeCompareTab === 'advance' ? 'bg-amber-50/20' : ''}`}>
+                        {row.advance ? <Check size={18} className="text-amber-500 mx-auto md:w-5 md:h-5" /> : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className={`py-4 px-2 md:py-5 md:px-4 text-center w-[17%] transition-all duration-300 ${activeCompareTab === 'custom' ? 'bg-pink-50/20' : ''}`}>
+                        {row.custom ? <Check size={18} className="text-pink-500 mx-auto md:w-5 md:h-5" /> : <span className="text-slate-300">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* --- FAQ SECTION --- */}
+      <section className="relative z-10 py-24 px-4 bg-[#FAFAFA]">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-4 tracking-tight">Frequently Asked Questions</h2>
+            <p className="text-slate-500 text-lg font-light">Everything you need to know about the product and billing.</p>
+          </div>
+
+          <div className="space-y-4">
+            {faqs.map((faq, index) => (
+              <motion.div
+                key={index}
+                className={`rounded-[1.5rem] border transition-all duration-300 overflow-hidden ${activeFAQ === index ? 'border-purple-200 bg-white shadow-lg shadow-purple-500/5' : 'border-slate-200 bg-white hover:border-purple-200/50'
+                  }`}
+              >
+                <button
+                  onClick={() => setActiveFAQ(activeFAQ === index ? null : index)}
+                  className="w-full flex items-center justify-between p-6 sm:p-8 text-left"
+                >
+                  <span className="font-bold text-slate-900 text-base sm:text-lg pr-8">{faq.question}</span>
+                  <motion.div
+                    animate={{ rotate: activeFAQ === index ? 180 : 0 }}
+                    transition={{ duration: 0.3 }}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${activeFAQ === index ? 'bg-purple-100 text-purple-600' : 'bg-slate-50 text-slate-400'
+                      }`}
+                  >
+                    <ChevronDown size={18} strokeWidth={3} />
+                  </motion.div>
+                </button>
+                <AnimatePresence>
+                  {activeFAQ === index && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                    >
+                      <div className="px-6 sm:px-8 pb-6 sm:pb-8 pt-0 text-slate-600 font-light leading-relaxed">
+                        {faq.answer}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* --- CTA SECTION --- */}
+      <section className="py-24 px-4 bg-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-pink-100 rounded-full blur-[80px] opacity-60 pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-100 rounded-full blur-[80px] opacity-60 pointer-events-none"></div>
+
+        <div className="container mx-auto">
+          <motion.div whileInView={{ opacity: 1, y: 0 }} initial={{ opacity: 0, y: 40 }} viewport={{ once: true }} className="max-w-5xl mx-auto bg-slate-950 rounded-[3rem] p-10 sm:p-16 text-center relative shadow-2xl overflow-hidden z-10">
+            {/* Inner Glow */}
+            <div className="absolute inset-0 bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-blue-600/20 blur-3xl mix-blend-overlay"></div>
+
+            <h2 className="text-3xl sm:text-5xl font-light text-white mb-6 tracking-tight relative z-10">
+              Ready to <span className="font-black bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-blue-400">Transform Your Campus?</span>
+            </h2>
+            <p className="text-slate-400 font-light text-base sm:text-lg mb-10 max-w-2xl mx-auto relative z-10">
+              Start with any plan and upgrade anytime. All plans include a 14-day free trial and full onboarding support from our expert team.
+            </p>
+
+            <div className="flex flex-col sm:flex-row justify-center gap-4 relative z-10">
+              <button type="button" onClick={(e) => { e.preventDefault(); setIsTrialPopupOpen(true); }} className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-600 text-white rounded-xl font-bold uppercase text-sm tracking-widest shadow-lg hover:shadow-purple-500/25 hover:-translate-y-1 transition-all duration-300 w-full sm:w-auto">
+                Start Free Trial <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+              <button onClick={() => window.location.href = "mailto:sales@stalight.in"} className="inline-flex items-center justify-center px-8 py-4 bg-white/10 border border-white/20 text-white rounded-xl font-bold uppercase text-sm tracking-widest hover:bg-white/20 transition-all duration-300 w-full sm:w-auto backdrop-blur-sm">
+                Contact Sales
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      <footer className="relative z-10 py-12 px-4 border-t border-slate-200 bg-white">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-3">
+            <img src="/applogo.png" alt="Stalight Campus Logo" className="w-12 h-12 rounded-full object-cover shadow-md" />
+            <div className="flex flex-col">
+              <span className="font-bold text-xl text-slate-900 leading-none mb-1">Stalight Campus</span>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Stalight Technologies Pvt Ltd</span>
+            </div>
+          </div>
+          <div className="text-sm text-slate-500 font-medium">
+            &copy; {new Date().getFullYear()} Stalight Campus. All rights reserved.
+          </div>
+        </div>
+      </footer>
+
+      {/* Trial Popup */}
+      <AnimatePresence>
+        {isTrialPopupOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsTrialPopupOpen(false)}
+              className="absolute inset-0 bg-slate-900/80"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden z-10 p-8 text-center border border-slate-100"
+            >
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); setIsTrialPopupOpen(false); }}
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="mx-auto mb-6 flex justify-center">
+                <img src="/logo.jpeg" alt="Stalight Campus Logo" className="w-20 h-20 rounded-2xl shadow-lg shadow-blue-500/10 object-cover border border-slate-100" />
+              </div>
+
+              <h3 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">Claim Your Free Trial</h3>
+
+              <p className="text-slate-600 mb-6 leading-relaxed">
+                Get access with the coupon and use our software for 14 days completely free. Contact us on WhatsApp to get your coupon code instantly!
+              </p>
+
+              <div className="flex items-center justify-center gap-4 mb-8">
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg"
+                  alt="Download on the App Store"
+                  className="h-10 cursor-pointer hover:opacity-80 transition-opacity"
+                />
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg"
+                  alt="Get it on Google Play"
+                  className="h-10 cursor-pointer hover:opacity-80 transition-opacity"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.open('https://wa.me/917349551102?text=Hello%20Stalight%20Team%2C%20I%20want%20to%20get%20access%20to%20the%2014%20days%20free%20trial%20coupon', '_blank');
+                }}
+                className="group flex items-center justify-center gap-3 w-full bg-[#25D366] hover:bg-[#20bd5a] text-white py-4 px-6 rounded-xl font-bold transition-all duration-300 shadow-lg shadow-green-500/25 hover:-translate-y-1"
+              >
+                <MessageCircle size={20} />
+                <span>Get Coupon on WhatsApp</span>
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export default Pricing;

@@ -1,0 +1,831 @@
+import { translateTerminology, getTerm, getInstitutionType } from "../../utils/institutionConfig";
+import { useState, useEffect, forwardRef } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui/card";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/select";
+import { useToast } from "../ui/use-toast";
+import { Pencil, Trash2, Plus, X, FileDown, Loader2 } from "lucide-react";
+import { fetchWithTokenRefresh } from "../../utils/authService";
+import { API_ENDPOINT } from "../../utils/config";
+import { SkeletonTable } from "../ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "../ui/dialog";
+import { getSemesters, manageSemesters, manageSections, manageProfile, getSemesterBootstrap } from "../../utils/hod_api";
+import { useHODBootstrap } from "../../context/HODBootstrapContext";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { cn } from "../../lib/utils";
+import { useTheme } from "../../context/ThemeContext";
+import { showConfirmAlert, showSuccessAlert, showErrorAlert } from "../../utils/sweetalert";
+import Swal from "sweetalert2";
+
+interface Semester {
+  id: string;
+  number: number;
+}
+
+interface Section {
+  id: string;
+  name: string;
+  semester_id: string;
+}
+
+interface FormState {
+  number: string;
+}
+
+interface SectionFormState {
+  name: string;
+}
+
+// Custom SelectContent components without scroll arrows
+const CustomSelectContent = forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
+>(({ className, children, position = "popper", ...props }, ref) => (
+  <SelectPrimitive.Portal>
+    <SelectPrimitive.Content
+      ref={ref}
+      className={cn(
+        "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        position === "popper" &&
+        "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+        className
+      )}
+      position={position}
+      {...props}
+    >
+      <SelectPrimitive.Viewport
+        className={cn(
+          "p-1 max-h-[calc(100%-8px)] overflow-y-auto custom-scrollbar",
+          position === "popper" &&
+          "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
+        )}
+      >
+        {children}
+      </SelectPrimitive.Viewport>
+    </SelectPrimitive.Content>
+  </SelectPrimitive.Portal>
+));
+CustomSelectContent.displayName = SelectPrimitive.Content.displayName;
+
+const SemesterManagement = () => {
+  const { toast } = useToast();
+  const { theme } = useTheme();
+  const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
+  const [editingSemester, setEditingSemester] = useState<Semester | null>(null);
+  const [managingSemester, setManagingSemester] = useState<Semester | null>(null);
+  const [form, setForm] = useState<FormState>({ number: "" });
+  const [sectionForm, setSectionForm] = useState<SectionFormState>({ name: "" });
+  const [branchId, setBranchId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [editingSectionsSemesterId, setEditingSectionsSemesterId] = useState<string | null>(null);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+  const bootstrap = useHODBootstrap();
+
+  const [deleteSemDialogOpen, setDeleteSemDialogOpen] = useState(false);
+  const [semToDelete, setSemToDelete] = useState<Semester | null>(null);
+  const [confirmSemName, setConfirmSemName] = useState("");
+
+  const [deleteSecDialogOpen, setDeleteSecDialogOpen] = useState(false);
+  const [secToDelete, setSecToDelete] = useState<Section | null>(null);
+  const [confirmSecName, setConfirmSecName] = useState("");
+
+  const handleExportPDF = async () => {
+    setDownloadingPDF(true);
+    try {
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/hod/semesters/export-pdf/`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Semester_List_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        toast({
+          title: "Success",
+          description: "Semester list PDF exported successfully",
+        });
+      } else {
+        const result = await response.json().catch(() => ({}));
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: result.message || "Failed to export PDF",
+        });
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Network error while exporting PDF",
+      });
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
+  // Derive NAME and YEAR from semester number
+  const getSemesterName = (number: number) => {
+    if (getInstitutionType() === "school") {
+      return `Class ${number}`;
+    }
+    let suffix = "th";
+    if (number % 10 === 1 && number % 100 !== 11) suffix = "st";
+    else if (number % 10 === 2 && number % 100 !== 12) suffix = "nd";
+    else if (number % 10 === 3 && number % 100 !== 13) suffix = "rd";
+    return `${number}${suffix} Semester`;
+  };
+
+  const getYear = (number: number) => {
+    return `Year ${Math.ceil(number / 2)}`;
+  };
+
+  // Fetch branch_id, semesters, and sections
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Use the bootstrap endpoint for better performance - only fetch needed data
+        const bootstrapResponse = await getSemesterBootstrap(['profile', 'semesters', 'sections']);
+        if (bootstrapResponse.success && bootstrapResponse.data) {
+          setBranchId(bootstrapResponse.data.profile.branch_id);
+          setSemesters(bootstrapResponse.data.semesters.map((s: any) => ({ id: s.id.toString(), number: s.number })));
+          setSections(bootstrapResponse.data.sections.map((s: any) => ({ id: s.id, name: s.name, semester_id: s.semester_id?.toString() })));
+        } else {
+          throw new Error(bootstrapResponse.message || "Failed to fetch data");
+        }
+      } catch (err: any) {
+        const errorMessage = err.message || "Network error";
+        toast({ variant: "destructive", title: "Error", description: errorMessage });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [toast]);
+
+  const openModal = (sem: Semester | null = null) => {
+    if (sem) {
+      setEditingSemester(sem);
+      setForm({ number: sem.number.toString() });
+    } else {
+      setEditingSemester(null);
+      setForm({ number: "" });
+    }
+    setIsModalOpen(true);
+  };
+
+  const openDeleteModal = (sem: Semester) => {
+    setSemToDelete(sem);
+    setConfirmSemName("");
+    setDeleteSemDialogOpen(true);
+  };
+
+  const openSectionModal = (sem: Semester) => {
+    setManagingSemester(sem);
+    setSectionForm({ name: "" });
+    setIsSectionModalOpen(true);
+  };
+
+  const openDeleteSectionModal = (section: Section) => {
+    setSecToDelete(section);
+    setConfirmSecName("");
+    setDeleteSecDialogOpen(true);
+  };
+
+  const confirmDeleteSemester = async () => {
+    if (!semToDelete) return;
+
+    const currentTheme = theme === 'dark' ? 'dark' : 'light';
+    const result = await Swal.fire({
+      title: 'Final Confirmation',
+      text: `Are you absolutely sure you want to delete ${getSemesterName(semToDelete.number)}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#3b82f6',
+      confirmButtonText: 'Yes, delete it!',
+      background: currentTheme === 'dark' ? '#1f2937' : '#fff',
+      color: currentTheme === 'dark' ? '#fff' : '#000'
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    await executeDelete(semToDelete);
+    setDeleteSemDialogOpen(false);
+    setSemToDelete(null);
+  };
+
+  const confirmDeleteSection = async () => {
+    if (!secToDelete) return;
+
+    const semNumber = semesters.find(s => s.id === secToDelete.semester_id)?.number;
+    const currentTheme = theme === 'dark' ? 'dark' : 'light';
+    const result = await Swal.fire({
+      title: 'Final Confirmation',
+      text: `Are you absolutely sure you want to delete Section ${secToDelete.name} from Semester ${semNumber || ""}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#3b82f6',
+      confirmButtonText: 'Yes, delete it!',
+      background: currentTheme === 'dark' ? '#1f2937' : '#fff',
+      color: currentTheme === 'dark' ? '#fff' : '#000'
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    await executeDeleteSection(secToDelete);
+    setDeleteSecDialogOpen(false);
+    setSecToDelete(null);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingSemester(null);
+    setForm({ number: "" });
+  };
+
+  const closeSectionModal = () => {
+    setIsSectionModalOpen(false);
+    setManagingSemester(null);
+    setSectionForm({ name: "" });
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSectionChange = (value: string) => {
+    setSectionForm((prev) => ({ ...prev, name: value }));
+  };
+
+  const handleSave = async () => {
+    if (!branchId) {
+      toast({ variant: "destructive", title: "Error", description: "Branch ID is missing" });
+      return;
+    }
+    if (!form.number || isNaN(Number(form.number)) || Number(form.number) < 1 || Number(form.number) > 20) {
+      toast({ variant: "destructive", title: "Error", description: "Please enter a valid semester number (1-20)" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data: any = {
+        action: editingSemester ? "update" : "create",
+        number: Number(form.number),
+        branch_id: branchId,
+      };
+      if (editingSemester) {
+        data.semester_id = editingSemester.id;
+      }
+      const response = await manageSemesters(data);
+      if (response.success) {
+        // Prefer server-returned semesters to avoid extra fetch
+        const returnedSemesters = (response as any).semesters || (response.data && (response.data.semesters as any[]));
+        if (returnedSemesters && Array.isArray(returnedSemesters)) {
+          setSemesters(returnedSemesters.map((s: any) => ({ id: s.id.toString(), number: s.number })));
+        }
+        toast({
+          title: editingSemester ? "Updated" : "Created",
+          description: `Semester ${editingSemester ? "updated" : "created"} successfully!`,
+        });
+        closeModal();
+      } else {
+        throw new Error(response.message || "Failed to save semester");
+      }
+    } catch (err: any) {
+      const errorMessage = err.message || "Network error";
+      toast({ variant: "destructive", title: "Error", description: errorMessage });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const executeDelete = async (sem: Semester) => {
+    if (!sem || !branchId) return;
+    setLoading(true);
+    try {
+      const data: any = {
+        action: "delete",
+        semester_id: sem.id,
+        branch_id: branchId,
+      };
+      const response = await manageSemesters(data);
+      if (response.success) {
+        // Prefer server-returned semesters and sections to avoid extra fetch
+        const returnedSemesters = (response as any).semesters || (response.data && (response.data.semesters as any[]));
+        const returnedSections = (response as any).sections || (response.data && (response.data.sections as any[]));
+        if (returnedSemesters && Array.isArray(returnedSemesters)) {
+          setSemesters(returnedSemesters.map((s: any) => ({ id: s.id.toString(), number: s.number })));
+        }
+        if (returnedSections && Array.isArray(returnedSections)) {
+          setSections(returnedSections.map((s: any) => ({ id: s.id, name: s.name, semester_id: s.semester_id?.toString() })));
+        }
+        showSuccessAlert("Deleted", "Semester deleted successfully!");
+      } else {
+        throw new Error(response.message || "Semester deletion is not supported by the server");
+      }
+    } catch (err: any) {
+      const errorMessage = err.message || "Network error";
+      showErrorAlert("Error", errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveSection = async () => {
+    if (!managingSemester || !branchId) {
+      toast({ variant: "destructive", title: "Error", description: "Semester or Branch ID is missing" });
+      return;
+    }
+    if (!sectionForm.name || !["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"].includes(sectionForm.name)) {
+      toast({ variant: "destructive", title: "Error", description: "Please select a valid section (A-Z)" });
+      return;
+    }
+    if (sections.some(s => s.semester_id === managingSemester.id && s.name === sectionForm.name)) {
+      toast({ variant: "destructive", title: "Error", description: `Section ${sectionForm.name} already exists for Semester ${managingSemester.number}` });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data: any = {
+        action: "create",
+        name: sectionForm.name,
+        semester_id: managingSemester.id,
+        branch_id: branchId,
+      };
+      const response = await manageSections(data, "POST");
+      if (response.success) {
+        // Prefer server-returned sections to avoid an extra fetch
+        const returnedSections = (response as any).sections || (response.data && (response.data.sections as any));
+        if (returnedSections && Array.isArray(returnedSections)) {
+          setSections(returnedSections.map((s: any) => ({ id: s.id, name: s.name, semester_id: s.semester_id?.toString() })));
+        }
+        toast({
+          title: "Added",
+          description: `Section ${sectionForm.name} added successfully!`,
+        });
+        closeSectionModal();
+      } else {
+        throw new Error(response.message || "Failed to add section");
+      }
+    } catch (err: any) {
+      const errorMessage = err.message || "Network error";
+      toast({ variant: "destructive", title: "Error", description: errorMessage });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const executeDeleteSection = async (section: Section) => {
+    if (!section || !branchId) return;
+    setLoading(true);
+    try {
+      const data: any = {
+        action: "delete",
+        section_id: section.id,
+        branch_id: branchId,
+      };
+      const response = await manageSections(data, "POST");
+      if (response.success) {
+        // Prefer server-returned sections to avoid an extra fetch
+        const returnedSections = (response as any).sections || (response.data && (response.data as any));
+        if (returnedSections && Array.isArray(returnedSections)) {
+          setSections(returnedSections.map((s: any) => ({ id: s.id, name: s.name, semester_id: s.semester_id?.toString() })));
+        }
+        showSuccessAlert("Deleted", `Section ${section.name} deleted successfully!`);
+      } else {
+        throw new Error(response.message || "Section deletion is not supported by the server");
+      }
+    } catch (err: any) {
+      const errorMessage = err.message || "Network error";
+      showErrorAlert("Error", errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredSemesters = semesters.filter((sem) =>
+    `Semester ${sem.number}`.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div id="hod-semester-container" className={`space-y-6 ${theme === 'dark' ? 'bg-background text-foreground' : 'bg-gray-50 text-gray-900'}`}>
+      <Card className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-200'}>
+        <CardHeader className="border-b pb-4">
+          <div id="semester-list-header" className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full gap-3">
+            <div>
+              <CardTitle className={`text-xl sm:text-2xl font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>{translateTerminology("Semester List")}</CardTitle>
+              <CardDescription className="text-sm text-muted-foreground mt-1">{translateTerminology("Define academic semesters, tracks, and active periods.")}</CardDescription>
+            </div>
+            <div className="flex flex-row items-center gap-2 w-full sm:w-auto">
+              <Button
+                onClick={() => openModal()}
+                disabled={loading || !branchId}
+                className="flex-1 sm:flex-initial text-foreground bg-primary text-white border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white justify-center h-10"
+              >
+                + {translateTerminology("Add Semester")}
+              </Button>
+              {/* Mobile Download PDF Icon Button */}
+              <Button
+                onClick={handleExportPDF}
+                disabled={loading || !branchId || downloadingPDF}
+                size="icon"
+                variant="outline"
+                className="flex sm:hidden h-10 w-10 items-center justify-center shrink-0 border border-input bg-background text-foreground"
+              >
+                {downloadingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+              </Button>
+              {/* Desktop Download PDF Button */}
+              <Button
+                onClick={handleExportPDF}
+                disabled={loading || !branchId || downloadingPDF}
+                className="hidden sm:flex w-full sm:w-auto items-center justify-center gap-1.5 bg-primary text-white border-primary hover:bg-primary/90 h-10"
+              >
+                {downloadingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                {downloadingPDF ? "Exporting..." : "Export PDF"}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+
+
+          {loading ? (
+            <div className="py-4">
+              <SkeletonTable rows={10} cols={4} />
+            </div>
+          ) : filteredSemesters.length === 0 ? (
+            <div className={`text-center py-4 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>No semesters found.</div>
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              {/* Mobile: stacked list - visible on mobile only */}
+              <div className={`${theme === 'dark' ? 'space-y-3 p-3 sm:hidden' : 'space-y-3 p-3 sm:hidden'}`}>
+                {filteredSemesters.map((sem) => {
+                  const semesterSections = sections
+                    .filter((s) => s.semester_id === sem.id)
+                    .sort((a, b) => a.name.localeCompare(b.name));
+
+                  return (
+                    <article key={sem.id} className={`p-4 rounded-md ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-200'}`} aria-labelledby={`sem-${sem.id}`}>
+                      <h3 id={`sem-${sem.id}`} className="text-base font-semibold">{getSemesterName(sem.number)}</h3>
+                      {getInstitutionType() !== 'school' && (
+                        <p className="text-sm text-muted-foreground mt-1">{getYear(sem.number)}</p>
+                      )}
+
+                      <div className="mt-3">
+                        <div className="text-sm font-medium">Sections:</div>
+                        <ul className="mt-2 flex flex-wrap gap-2">
+                          {semesterSections.length > 0 ? (
+                            semesterSections.map((section) => (
+                              <li key={section.id} className={`inline-flex items-center justify-center text-sm font-medium px-3 py-1 rounded-full ${theme === 'dark' ? 'bg-muted-foreground text-foreground' : 'bg-gray-100 text-gray-900'}`}>
+                                {section.name}
+                              </li>
+                            ))
+                          ) : (
+                            <li className="text-sm text-gray-500">No sections</li>
+                          )}
+                        </ul>
+                      </div>
+
+                      <div className="mt-3 flex gap-2">
+                        <Button onClick={() => openSectionModal(sem)} disabled={loading} className="flex-1 text-sm bg-primary text-white hover:bg-primary/90 border-transparent shadow-sm">
+                          Add
+                        </Button>
+                        <Button onClick={() => openModal(sem)} disabled={loading} className={`flex-1 text-sm ${theme === 'dark' ? 'bg-card border-border hover:bg-accent' : 'bg-white border-gray-300 hover:bg-gray-100 border bottom-2 text-black'}`}>
+                          Edit
+                        </Button>
+                        <Button onClick={() => openDeleteModal(sem)} disabled={loading} variant="destructive" className={`flex-1 flex items-center justify-center gap-1 text-sm font-medium px-3 py-1.5 rounded-md transition border ${theme === 'dark' ? 'border-red-500 text-red-400 bg-red-500/10 hover:bg-red-500/20' : 'border-red-500 text-red-700 bg-red-50 hover:bg-red-100'}`}>
+                          Delete
+                        </Button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              {/* Desktop / Tablet: keep existing table - hidden on mobile */}
+              <div className="hidden sm:block">
+                <table className="w-full text-sm table-fixed ">
+                  <thead className={theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-gray-100 text-gray-900 border-gray-300'}>
+                    <tr className="border-b">
+                      <th className="p-2 text-left" style={{ width: getInstitutionType() === 'school' ? '25%' : '15%' }}>NAME</th>
+                      {getInstitutionType() !== 'school' && (
+                        <th className="p-2 text-left" style={{ width: '15%' }}>YEAR</th>
+                      )}
+                      <th className="p-2 text-left" style={{ width: getInstitutionType() === 'school' ? '60%' : '50%' }}>SECTIONS</th>
+                      <th className="p-2 text-center" style={{ width: '15%' }}>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSemesters.map((sem) => {
+                      const semesterSections = sections
+                        .filter((s) => s.semester_id === sem.id)
+                        .sort((a, b) => a.name.localeCompare(b.name));
+
+                      return (
+                        <tr key={sem.id} className={`border-b text-center align-top ${theme === 'dark' ? 'hover:bg-accent' : 'hover:bg-gray-50'}`}>
+                          {/* Semester Name */}
+                          <td className={`p-2 text-left align-top ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>{getSemesterName(sem.number)}</td>
+
+                          {/* Year */}
+                          {getInstitutionType() !== 'school' && (
+                            <td className={`p-2 text-left align-top ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>{getYear(sem.number)}</td>
+                          )}
+
+                          {/* Sections */}
+                          <td className="p-2 text-left align-top">
+                            {semesterSections.length > 0 ? (
+                              editingSectionsSemesterId === sem.id ? (
+                                <div className="grid grid-cols-8 gap-2">
+                                  {semesterSections.map((section) => (
+                                    <div
+                                      key={section.id}
+                                      className={`flex flex-col items-center gap-1 px-2 py-2 border rounded-md text-center ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}
+                                    >
+                                      <span className="text-sm font-medium">{section.name}</span>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => openDeleteSectionModal(section)}
+                                        disabled={loading}
+                                        title="Delete Section"
+                                        className="mt-1"
+                                      >
+                                        <Trash2 className="h-4 w-4 text-red-600" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <ul className="flex flex-wrap gap-2">
+                                  {semesterSections.map((section) => (
+                                    <li key={section.id} className={`inline-flex items-center justify-center text-sm font-medium px-3 py-1 rounded-full ${theme === 'dark' ? 'bg-muted-foreground text-foreground' : 'bg-gray-100 text-gray-900'}`}>
+                                      {section.name}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )
+                            ) : (
+                              <span className={theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}>None</span>
+                            )}
+                          </td>
+
+                          {/* Semester Actions */}
+                          <td className="p-2 flex justify-center gap-2 items-center">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setEditingSectionsSemesterId(editingSectionsSemesterId === sem.id ? null : sem.id)}
+                              disabled={loading}
+                              title={editingSectionsSemesterId === sem.id ? "Close Sections Edit" : "Edit Sections"}
+                            >
+                              {editingSectionsSemesterId === sem.id ? (
+                                <X className="h-4 w-4" />
+                              ) : (
+                                <Pencil className="h-4 w-4" />
+                              )}
+                            </Button>
+
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => openSectionModal(sem)}
+                              disabled={loading}
+                              title="Add Section"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => openDeleteModal(sem)}
+                              disabled={loading}
+                              title={translateTerminology("Delete Semester")}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Semester Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className={`${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} w-[90%] sm:max-w-lg rounded-md sm:rounded-lg`}>
+          <DialogHeader>
+            <h2 className={`text-lg font-semibold text-center ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+              {editingSemester ? translateTerminology("Edit Semester") : translateTerminology("Add Semester")}
+            </h2>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-center">
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>{translateTerminology("Semester Number")}</label>
+              <Input
+                type="number"
+                name="number"
+                value={form.number}
+                onChange={handleChange}
+                onWheel={(e) => e.currentTarget.blur()}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                  }
+                }}
+                placeholder={translateTerminology("Enter semester number")}
+                min="1"
+                max="20"
+                disabled={loading}
+                className={`text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-4 flex flex-col sm:flex-row sm:justify-end gap-2">
+            <Button
+              onClick={closeModal}
+              disabled={loading}
+              className={`w-full sm:w-auto ${theme === 'dark' ? 'bg-card border-border hover:bg-accent text-foreground' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-200'}`}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={loading} className="w-full sm:w-auto bg-primary text-white border-primary hover:bg-primary/90 hover:border-primary/90">
+              {editingSemester ? "Save Changes" : translateTerminology("Add Semester")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Section Modal */}
+      <Dialog open={isSectionModalOpen} onOpenChange={setIsSectionModalOpen}>
+        <DialogContent className={`${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} w-[92%] sm:max-w-lg rounded-md sm:rounded-lg`}>
+          <DialogHeader>
+            <h2 className={`text-lg font-semibold text-center ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
+              Add Section for Semester {managingSemester?.number}
+            </h2>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-center">
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Section Name</label>
+              <Select
+                value={sectionForm.name}
+                onValueChange={handleSectionChange}
+                disabled={loading}
+              >
+                <SelectTrigger className={`w-full ${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'}`}>
+                  <SelectValue placeholder="Select Section" />
+                </SelectTrigger>
+                <CustomSelectContent className={`${theme === 'dark' ? 'bg-card text-foreground border-border' : 'bg-white text-gray-900 border-gray-300'} max-h-[200px]`}>
+                  {["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"].map((section) => (
+                    <SelectItem key={section} value={section} className={theme === 'dark' ? 'text-foreground hover:bg-accent' : 'text-gray-900 hover:bg-gray-100'}>
+                      Section {section}
+                    </SelectItem>
+                  ))}
+                </CustomSelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="mt-4 flex flex-col sm:flex-row sm:justify-end gap-2">
+            <Button onClick={closeSectionModal} disabled={loading} className={`w-full sm:w-auto ${theme === 'dark' ? 'bg-card border-2 border-border hover:bg-accent text-foreground' : 'bg-white text-gray-700 border-2 border-gray-200 hover:bg-gray-200'}`}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSection} disabled={loading} className="w-full sm:w-auto bg-primary text-white border-primary hover:bg-primary/90 hover:border-primary/90">
+              Add Section
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Semester Confirmation Dialog */}
+      <Dialog open={deleteSemDialogOpen} onOpenChange={(open) => {
+        setDeleteSemDialogOpen(open);
+        if (!open) setConfirmSemName("");
+      }}>
+        <DialogContent className={`${theme === 'dark' ? 'bg-card text-foreground border border-border' : 'bg-white text-gray-900 border border-gray-200'} max-w-[400px] w-full rounded-xl shadow-xl`}>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Delete Semester</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <p className={theme === 'dark' ? 'text-muted-foreground' : 'text-gray-600'}>
+                Are you sure you want to delete <span className="font-semibold text-foreground">"{semToDelete ? getSemesterName(semToDelete.number) : ""}"</span>?
+              </p>
+              <p className="text-sm text-destructive font-medium mt-2">
+                This action cannot be undone and will remove all associations.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className={`block text-xs font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-700'}`}>
+                Please type <span className="font-bold">{semToDelete ? getSemesterName(semToDelete.number) : ""}</span> to confirm:
+              </label>
+              <Input
+                value={confirmSemName}
+                onChange={(e) => setConfirmSemName(e.target.value)}
+                placeholder={semToDelete ? getSemesterName(semToDelete.number) : ""}
+                className={theme === 'dark' ? 'bg-card text-foreground border border-border' : 'bg-white text-gray-900 border border-gray-300'}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDeleteSemDialogOpen(false);
+                setConfirmSemName("");
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteSemester}
+              disabled={loading || confirmSemName !== (semToDelete ? getSemesterName(semToDelete.number) : "")}
+              className="flex-1"
+            >
+              {loading ? "Deleting..." : "Delete Semester"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Section Confirmation Dialog */}
+      <Dialog open={deleteSecDialogOpen} onOpenChange={(open) => {
+        setDeleteSecDialogOpen(open);
+        if (!open) setConfirmSecName("");
+      }}>
+        <DialogContent className={`${theme === 'dark' ? 'bg-card text-foreground border border-border' : 'bg-white text-gray-900 border border-gray-200'} max-w-[400px] w-full rounded-xl shadow-xl`}>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Delete Section</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <p className={theme === 'dark' ? 'text-muted-foreground' : 'text-gray-600'}>
+                Are you sure you want to delete <span className="font-semibold text-foreground">"Section {secToDelete?.name}"</span>?
+              </p>
+              <p className="text-sm text-destructive font-medium mt-2">
+                This action cannot be undone and will remove all associations.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className={`block text-xs font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-700'}`}>
+                Please type <span className="font-bold">Section {secToDelete?.name}</span> to confirm:
+              </label>
+              <Input
+                value={confirmSecName}
+                onChange={(e) => setConfirmSecName(e.target.value)}
+                placeholder={`Section ${secToDelete?.name || ""}`}
+                className={theme === 'dark' ? 'bg-card text-foreground border border-border' : 'bg-white text-gray-900 border border-gray-300'}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDeleteSecDialogOpen(false);
+                setConfirmSecName("");
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteSection}
+              disabled={loading || confirmSecName !== `Section ${secToDelete?.name || ""}`}
+              className="flex-1"
+            >
+              {loading ? "Deleting..." : "Delete Section"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+    </div>
+  );
+};
+
+export default SemesterManagement;

@@ -1,0 +1,947 @@
+import { translateTerminology, getTerm } from "@/utils/institutionConfig";
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  CheckCircle2,
+  User,
+  CheckCircle,
+  MousePointer2,
+  LayoutGrid,
+  Search,
+  Filter,
+  Users,
+  Calendar,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Eye
+} from
+  'lucide-react';
+import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "@/context/ThemeContext";
+import {
+  getFeesManagerFilters,
+  getFeesManagerSemesters,
+  getFeesManagerSections,
+  getFeesManagerAssignments,
+  deleteFeeAssignment
+} from
+  "../../utils/fees_manager_api";
+import { showConfirmAlert, showSuccessAlert, showErrorAlert } from "../../utils/sweetalert";
+import {
+  Skeleton,
+  SkeletonStatsGrid,
+  SkeletonTable,
+  SkeletonList,
+  SkeletonPageHeader,
+  SkeletonCard
+} from
+  "@/components/ui/skeleton";
+
+
+interface Assignment {
+  student: {
+    id: number;
+    name: string;
+    usn: string;
+    department: string;
+    semester: number;
+    section: string;
+    batch: string;
+    admission_mode: string;
+  };
+  template: {
+    id: number;
+    name: string;
+    total_amount: number;
+    fee_type: string;
+  };
+  academic_year: string;
+  assigned_at: string;
+  due_date?: string;
+  is_active: boolean;
+}
+
+interface FilterData {
+  batches: { id: number; name: string; }[];
+  branches: { id: number; name: string; code: string; }[];
+  admission_modes: string[];
+}
+
+const IndividualFeeAssignment: React.FC = () => {
+  const { theme } = useTheme();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Data States
+  const [filterData, setFilterData] = useState<FilterData>({ batches: [], branches: [], admission_modes: [] });
+  const [semesters, setSemesters] = useState<{ id: number; number: number; name: string; }[]>([]);
+  const [sections, setSections] = useState<{ id: number; name: string; }[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [templates, setTemplates] = useState<{ id: number; name: string; total_amount: number; fee_type: string }[]>([]);
+
+  // Loading states for cascading filters
+  const [loadingInitialFilters, setLoadingInitialFilters] = useState(false);
+  const [loadingSemesters, setLoadingSemesters] = useState(false);
+  const [loadingSections, setLoadingSections] = useState(false);
+
+  // Selection States
+  const [selectedFilters, setSelectedFilters] = useState({
+    batchId: '',
+    branchId: '',
+    semesterId: '',
+    sectionId: '',
+    admissionMode: ''
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+
+  const [openSelect, setOpenSelect] = useState<'batch' | 'branch' | 'semester' | 'section' | 'admission' | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    totalPages: 1,
+    totalCount: 0,
+    pageSize: 20
+  });
+
+  // Group by Student toggle state & modal view
+  const [groupByStudent, setGroupByStudent] = useState(false);
+  const [selectedStudentForModal, setSelectedStudentForModal] = useState<{
+    student: Assignment['student'];
+    assignments: Assignment[];
+  } | null>(null);
+
+  // Build grouped map: studentId -> { student, assignments[] }
+  const groupedAssignments = React.useMemo(() => {
+    const map = new Map<number, { student: Assignment['student']; assignments: Assignment[] }>();
+    assignments.forEach(assign => {
+      const sid = assign.student.id;
+      if (!map.has(sid)) map.set(sid, { student: assign.student, assignments: [] });
+      map.get(sid)!.assignments.push(assign);
+    });
+    return Array.from(map.values());
+  }, [assignments]);
+
+  // Fetch initial filters
+  const fetchInitialFilters = useCallback(async () => {
+    try {
+      setLoadingInitialFilters(true);
+      const filterJson = await getFeesManagerFilters();
+
+      if (!filterJson.success) {
+        throw new Error('Failed to fetch initial data');
+      }
+
+      setFilterData(filterJson.data);
+      setTemplates(filterJson.data?.templates || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoadingInitialFilters(false);
+    }
+  }, []);
+
+  // Fetch semesters when branch changes
+  useEffect(() => {
+    if (!selectedFilters.branchId || selectedFilters.branchId === 'all_branches') {
+      setSemesters([]);
+      setSelectedFilters((prev) => ({ ...prev, semesterId: '', sectionId: '' }));
+      return;
+    }
+
+    const fetchSemesters = async () => {
+      try {
+        setLoadingSemesters(true);
+        const res = await getFeesManagerSemesters(selectedFilters.branchId);
+        if (res.success) {
+          setSemesters(res.data || []);
+        }
+      } catch (err) {
+
+      } finally {
+        setLoadingSemesters(false);
+      }
+    };
+    fetchSemesters();
+  }, [selectedFilters.branchId]);
+
+  // Fetch sections when semester changes
+  useEffect(() => {
+    if (!selectedFilters.semesterId || !selectedFilters.branchId) {
+      setSections([]);
+      setSelectedFilters((prev) => ({ ...prev, sectionId: '' }));
+      return;
+    }
+
+    const fetchSections = async () => {
+      try {
+        setLoadingSections(true);
+        const res = await getFeesManagerSections(selectedFilters.branchId, selectedFilters.semesterId);
+        if (res.success) {
+          setSections(res.data || []);
+        }
+      } catch (err) {
+
+      } finally {
+        setLoadingSections(false);
+      }
+    };
+    fetchSections();
+  }, [selectedFilters.semesterId, selectedFilters.branchId]);
+
+  // Fetch assignments based on filters
+  const fetchAssignments = useCallback(async (page: number = 1) => {
+    try {
+      setLoading(true);
+      const params = {
+        page: page.toString(),
+        page_size: pagination.pageSize.toString(),
+        ...(selectedFilters.batchId && { batch_id: selectedFilters.batchId }),
+        ...(selectedFilters.branchId && { branch_id: selectedFilters.branchId }),
+        ...(selectedFilters.semesterId && { semester_id: selectedFilters.semesterId }),
+        ...(selectedFilters.sectionId && { section_id: selectedFilters.sectionId }),
+        ...(selectedFilters.admissionMode && { admission_mode: selectedFilters.admissionMode }),
+        ...(selectedTemplateId && { template_id: selectedTemplateId }),
+        ...(appliedSearch && { search: appliedSearch })
+      };
+
+      const json = await getFeesManagerAssignments(params);
+
+      if (!json.success) throw new Error(json.message || 'Failed to fetch assignments');
+
+      setAssignments(json.data.assignments || []);
+      setPagination((prev) => ({
+        ...prev,
+        page: json.data.meta.page,
+        totalPages: json.data.meta.total_pages,
+        totalCount: json.data.meta.count
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error loading assignments');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedFilters, appliedSearch, selectedTemplateId, pagination.pageSize]);
+
+  useEffect(() => {
+    fetchInitialFilters();
+  }, [fetchInitialFilters]);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(searchQuery.trim());
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Clear search query when dropdown filters change
+  useEffect(() => {
+    setSearchQuery("");
+    setAppliedSearch("");
+  }, [
+    selectedFilters.batchId,
+    selectedFilters.branchId,
+    selectedFilters.semesterId,
+    selectedFilters.sectionId,
+    selectedFilters.admissionMode
+  ]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const allFiltersSelected =
+        selectedFilters.batchId &&
+        selectedFilters.branchId &&
+        selectedFilters.semesterId &&
+        selectedFilters.sectionId &&
+        selectedFilters.admissionMode;
+
+      if (allFiltersSelected || selectedTemplateId || appliedSearch.trim().length > 0) {
+        fetchAssignments(1);
+      } else {
+        setAssignments([]);
+        setPagination((prev) => ({ ...prev, totalCount: 0 }));
+        setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [
+    selectedFilters.batchId,
+    selectedFilters.branchId,
+    selectedFilters.semesterId,
+    selectedFilters.sectionId,
+    selectedFilters.admissionMode,
+    selectedTemplateId,
+    appliedSearch,
+    fetchAssignments
+  ]);
+
+  const allFiltersSelected =
+    selectedFilters.batchId &&
+    selectedFilters.branchId &&
+    selectedFilters.semesterId &&
+    selectedFilters.sectionId &&
+    selectedFilters.admissionMode;
+  const canShowAssignments = allFiltersSelected || !!selectedTemplateId || appliedSearch.trim().length > 0;
+  const selectedTemplateLabel = templates.find((template) => template.id.toString() === selectedTemplateId)?.name || 'Filter';
+
+  const handleDelete = async (id: number) => {
+    const confirmed = await showConfirmAlert(
+      'Delete Assignment?',
+      'Are you sure you want to delete this fee assignment? This will also remove the associated unpaid invoice.',
+      'Yes, delete it'
+    );
+
+    if (!confirmed.isConfirmed) return;
+
+    try {
+      const res = await deleteFeeAssignment(id);
+
+      if (!res.success) {
+        throw new Error(res.message || 'Failed to delete assignment');
+      }
+
+      // Update local state instead of re-fetching
+      setAssignments((prev) => prev.filter((a) => a.id !== id));
+      setPagination((prev) => ({
+        ...prev,
+        totalCount: Math.max(0, prev.totalCount - 1)
+      }));
+
+      showSuccessAlert('Deleted!', 'Assignment deleted successfully');
+    } catch (err) {
+      showErrorAlert('Error', err instanceof Error ? err.message : 'Deletion failed');
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR'
+    }).format(amount || 0);
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  return (
+    <div id="feesmanager-individual-fees-container">
+      <Card className="overflow-hidden">
+        <div id="feesmanager-individual-assignments-filters">
+          <CardHeader className="border-b bg-muted/20 pb-6 px-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <CardTitle>
+                  Individual Fee Management
+                </CardTitle>
+                <p className="text-muted-foreground mt-1 text-md sm:text-sm">Review and manage existing student fee assignments</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="px-3 py-1 font-medium h-9">
+                  {pagination.totalCount} Assignments Found
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-6">
+            {/* Filters Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">Batch</Label>
+                <Select
+                  value={selectedFilters.batchId}
+                  open={openSelect === 'batch'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'batch' : null)}
+                  onValueChange={(val) => {
+                    setSelectedFilters((p) => ({ ...p, batchId: val }));
+                    setTimeout(() => setOpenSelect('branch'), 100);
+                  }}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select Batch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingInitialFilters ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        Loading batches...
+                      </SelectItem>
+                    ) : filterData.batches.length > 0 ? (
+                      filterData.batches.map((b) => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)
+                    ) : (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        No batches found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">{translateTerminology("Branch")}</Label>
+                <Select
+                  value={selectedFilters.branchId}
+                  open={openSelect === 'branch'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'branch' : null)}
+                  onValueChange={(val) => {
+                    setSelectedFilters((p) => ({ ...p, branchId: val }));
+                    setTimeout(() => setOpenSelect('semester'), 100);
+                  }}
+                  disabled={!selectedFilters.batchId}>
+
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder={translateTerminology("Select Branch")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingInitialFilters ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        Loading branches...
+                      </SelectItem>
+                    ) : filterData.branches.length > 0 ? (
+                      filterData.branches.map((b) => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)
+                    ) : (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        No branches found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">{translateTerminology("Semester")}</Label>
+                <Select
+                  value={selectedFilters.semesterId}
+                  open={openSelect === 'semester'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'semester' : null)}
+                  onValueChange={(val) => {
+                    setSelectedFilters((p) => ({ ...p, semesterId: val }));
+                    setTimeout(() => setOpenSelect('section'), 100);
+                  }}
+                  disabled={!selectedFilters.branchId}>
+
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder={translateTerminology("Select Semester")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingSemesters ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        Loading semesters...
+                      </SelectItem>
+                    ) : semesters.length > 0 ? (
+                      semesters.map((s) => <SelectItem key={s.id} value={s.id.toString()}>{translateTerminology(s.name)}</SelectItem>)
+                    ) : (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        No semesters found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">Section</Label>
+                <Select
+                  value={selectedFilters.sectionId}
+                  open={openSelect === 'section'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'section' : null)}
+                  onValueChange={(val) => {
+                    setSelectedFilters((p) => ({ ...p, sectionId: val }));
+                    setTimeout(() => setOpenSelect('admission'), 100);
+                  }}
+                  disabled={!selectedFilters.semesterId}>
+
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select Section" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    {loadingSections ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        Loading sections...
+                      </SelectItem>
+                    ) : sections.length > 0 ? (
+                      sections.map((s) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)
+                    ) : (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        No sections found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">Admission Mode</Label>
+                <Select
+                  value={selectedFilters.admissionMode}
+                  open={openSelect === 'admission'}
+                  onOpenChange={(open) => setOpenSelect(open ? 'admission' : null)}
+                  onValueChange={(val) => {
+                    setSelectedFilters((p) => ({ ...p, admissionMode: val }));
+                    setOpenSelect(null);
+                  }}
+                  disabled={!selectedFilters.sectionId}>
+
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select Admission Mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingInitialFilters ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        Loading admission modes...
+                      </SelectItem>
+                    ) : filterData.admission_modes.length > 0 ? (
+                      filterData.admission_modes.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)
+                    ) : (
+                      <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                        No admission modes found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Search Row */}
+            <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center">
+              <div className="relative w-full md:flex-1 md:max-w-none">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by student or USN..."
+                  className="pl-9 pr-12 bg-muted/20 border-border h-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)} />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-row items-center gap-2 md:ml-auto md:flex-nowrap md:gap-3">
+                <div className="flex-1 min-w-0 md:w-[220px] md:flex-initial">
+                  <Select
+                    value={selectedTemplateId}
+                    onValueChange={(val) => setSelectedTemplateId(val)}
+                    disabled={loadingInitialFilters || !allFiltersSelected}
+                  >
+                    <SelectTrigger className="h-10 w-full rounded-lg border-0 bg-violet-500 px-2.5 sm:px-4 font-semibold text-white shadow-sm transition-all hover:bg-violet-600 disabled:bg-violet-500 disabled:text-white disabled:opacity-60 disabled:shadow-none [&>svg]:text-current">
+                      <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2 overflow-hidden">
+                        <Filter className="h-4 w-4 flex-shrink-0" />
+                        <span className="block min-w-0 flex-1 truncate text-left text-xs sm:text-sm text-white font-semibold">
+                          {selectedTemplateLabel}
+                        </span>
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loadingInitialFilters ? (
+                        <SelectItem value="loading" disabled className="text-muted-foreground text-xs text-center">
+                          Loading templates...
+                        </SelectItem>
+                      ) : templates.length > 0 ? (
+                        <>
+
+                          {templates.map((template) => (
+                            <SelectItem key={template.id} value={template.id.toString()}>{template.name}</SelectItem>
+                          ))}
+                        </>
+                      ) : (
+                        <SelectItem value="none" disabled className="text-muted-foreground text-xs text-center">
+                          No templates found
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Group by Student toggle */}
+                <button
+                  onClick={() => setGroupByStudent(v => !v)}
+                  className={`flex-1 min-w-0 flex h-10 items-center justify-center gap-1.5 sm:gap-2 rounded-lg border px-2.5 sm:px-4 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap md:flex-initial ${groupByStudent
+                    ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                    : 'bg-background border-border/80 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                    }`}
+                  title="Toggle Group by Student"
+                >
+                  <Users className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">Group by Student</span>
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </div>
+
+        <CardContent className="p-6 pt-0">
+          <div className="border rounded-xl overflow-hidden shadow-sm">
+            {!canShowAssignments ? (
+              <div className="min-h-[400px] py-10 flex flex-col items-center justify-center bg-muted/5 px-4 text-center">
+                <div className="relative mb-6">
+                  <div className="absolute -top-3 -right-3 bg-primary/10 p-2 rounded-full animate-bounce sm:-top-4 sm:-right-4 sm:p-3">
+                    <MousePointer2 className="h-3 w-3 text-primary sm:h-4 sm:w-4" />
+                  </div>
+                  <div className="bg-muted/20 p-6 rounded-2xl border-2 border-dashed border-muted sm:p-8">
+                    <Filter className="h-6 w-6 text-muted-foreground/30 sm:h-8 sm:w-8" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Selection Required</h3>
+                <p className="text-muted-foreground max-w-sm mb-8 text-sm px-2">
+                  Please complete the cascading filter selection above to view fee assignments.
+                </p>
+                <div className="flex flex-wrap justify-center gap-4 sm:gap-6 w-full max-w-3xl">
+                  {[
+                    { label: 'Batch', active: !!selectedFilters.batchId },
+                    { label: translateTerminology("Branch"), active: !!selectedFilters.branchId },
+                    { label: translateTerminology("Semester"), active: !!selectedFilters.semesterId },
+                    { label: 'Section', active: !!selectedFilters.sectionId },
+                    { label: 'Admission', active: !!selectedFilters.admissionMode }
+                  ].map((step, i) => (
+                    <div key={step.label} className="flex flex-col items-center gap-2 min-w-[60px] sm:min-w-[80px]">
+                      <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold border-2 transition-all duration-300 ${step.active
+                        ? 'bg-primary border-primary text-white shadow-lg shadow-primary/25 scale-110'
+                        : 'bg-background border-muted text-muted-foreground opacity-60'
+                        }`}>
+                        {step.active ? <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" /> : i + 1}
+                      </div>
+                      <span className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider transition-colors duration-300 ${step.active ? 'text-primary' : 'text-muted-foreground opacity-60'
+                        }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : loading ? (
+              <div className="overflow-x-auto">
+                <SkeletonTable rows={10} cols={6} />
+              </div>
+            ) : assignments.length === 0 ? (
+              <div className="h-[400px] flex flex-col items-center justify-center text-muted-foreground italic px-6 text-center bg-muted/5">
+                <Users className="h-12 w-12 mb-4 opacity-10" />
+                <h3 className="text-lg font-semibold text-foreground not-italic mb-1">No Assignments Found</h3>
+                <p className="text-sm text-muted-foreground">Try adjusting your filters to find what you're looking for.</p>
+              </div>
+            ) : (
+
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow className="hover:bg-transparent">
+                      {groupByStudent ? (
+                        <>
+                          <TableHead className="font-semibold py-4 px-6 text-foreground h-12">Student Details</TableHead>
+                          <TableHead className="font-semibold text-foreground h-12 text-center">Department</TableHead>
+                          <TableHead className="font-semibold text-foreground h-12 text-center">Assignments Summary</TableHead>
+                          <TableHead className="font-semibold text-foreground h-12 text-center">Total Assigned</TableHead>
+                          <TableHead className="text-right font-semibold pr-6 text-foreground h-12">Action</TableHead>
+                        </>
+                      ) : (
+                        <>
+                          <TableHead className="font-semibold py-4 px-6 text-foreground h-12">Student Details</TableHead>
+                          <TableHead className="font-semibold text-foreground h-12 text-center">Department</TableHead>
+                          <TableHead className="font-semibold text-foreground h-12 text-center">Template Assigned</TableHead>
+                          <TableHead className="font-semibold text-foreground h-12 text-center">Total Amount</TableHead>
+                          <TableHead className="font-semibold text-foreground h-12 text-center">Assigned On</TableHead>
+                          <TableHead className="font-semibold text-foreground h-12 text-center">Due Date</TableHead>
+                          <TableHead className="text-right font-semibold pr-6 text-foreground h-12">Action</TableHead>
+                        </>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groupByStudent ? (
+                      groupedAssignments.map(({ student, assignments: studentAssigns }) => {
+                        const totalAmt = studentAssigns.reduce((s, i) => s + (i.template.total_amount || 0), 0);
+
+                        return (
+                          <TableRow
+                            key={student.id}
+                            className="hover:bg-primary/5 transition-all duration-200 border-b border-border/50 cursor-pointer"
+                            onClick={() => setSelectedStudentForModal({ student, assignments: studentAssigns })}
+                          >
+                            <TableCell className="py-4 px-6 align-middle">
+                              <div className="font-semibold text-foreground leading-tight">{student.name}</div>
+                              <div className="text-[10px] font-semibold text-muted-foreground font-mono uppercase tracking-tight mt-1">{student.usn}</div>
+                            </TableCell>
+                            <TableCell className="align-middle text-center">
+                              <div className="flex flex-col items-center justify-center">
+                                <div className="text-sm font-medium leading-tight">{student.department}</div>
+                                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-tight mt-1">Sem {student.semester} • Sec {student.section}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="align-middle text-center">
+                              <Badge variant="outline" className="text-[12px] font-semibold">
+                                {studentAssigns.length} Assignment{studentAssigns.length !== 1 ? 's' : ''}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="align-middle text-center">
+                              <span className="font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded text-sm">
+                                {formatCurrency(totalAmt)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right pr-6 align-middle">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 font-medium text-xs transition-all hover:bg-primary hover:text-white"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedStudentForModal({ student, assignments: studentAssigns });
+                                }}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                View
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      assignments.map((assignment) =>
+                        <TableRow key={assignment.id} className="hover:bg-primary/5 transition-all duration-200 border-b border-border/50">
+                          <TableCell className="py-5 px-6 align-middle">
+                            <div className="font-semibold text-foreground leading-tight">{assignment.student.name}</div>
+                            <div className="text-[10px] font-semibold text-muted-foreground font-mono uppercase tracking-tight mt-1">{assignment.student.usn}</div>
+                          </TableCell>
+                          <TableCell className="align-middle text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="text-sm font-medium leading-tight">{assignment.student.department}</div>
+                              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-tight mt-1">Sem {assignment.student.semester} • Sec {assignment.student.section}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-middle text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="font-semibold text-sm leading-tight">{assignment.template.name}</span>
+                              <Badge variant="outline" className="w-fit text-[10px] uppercase font-semibold tracking-widest px-2 border-border/50 h-5">
+                                {assignment.template.fee_type}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-middle text-center">
+                            <div className="inline-flex items-center justify-center">
+                              <span className="font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded text-sm">
+                                {formatCurrency(assignment.template.total_amount)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-middle text-center">
+                            <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-tight">
+                              <Calendar className="h-3.5 w-3.5 text-muted-foreground/50" />
+                              {formatDate(assignment.assigned_at)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-middle text-center">
+                            <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-tight">
+                              <Calendar className="h-3.5 w-3.5 text-muted-foreground/50" />
+                              {assignment.due_date ? formatDate(assignment.due_date) : '-'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right pr-6 align-middle">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full transition-all active:scale-95"
+                              onClick={() => handleDelete(assignment.id)}>
+
+                              <Trash2 className="h-4.5 w-4.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </CardContent>
+
+        {pagination.totalPages > 1 && (
+          <CardFooter className="py-4 bg-muted/5 flex flex-col sm:flex-row items-center justify-between border-t px-6 gap-4">
+            <div className={`text-sm ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
+              Showing {pagination.totalCount > 0 ? (pagination.page - 1) * pagination.pageSize + 1 : 0}
+              {" "}to{" "}
+              {Math.min(pagination.page * pagination.pageSize, pagination.totalCount)}
+              {" "}of {pagination.totalCount} assignments
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchAssignments(pagination.page - 1)}
+                disabled={pagination.page === 1 || loading}
+                className="text-white bg-primary border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white px-3 py-1 h-9"
+              >
+                Previous
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled
+                className={`${theme === 'dark'
+                  ? 'text-muted-foreground bg-card border border-border'
+                  : 'text-gray-700 bg-white border border-gray-300'
+                  } px-3 py-1 h-9 min-w-[36px]`}
+              >
+                {pagination.page}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchAssignments(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages || loading}
+                className="text-white bg-primary border-primary hover:bg-primary/90 hover:border-primary/90 hover:text-white px-3 py-1 h-9"
+              >
+                Next
+              </Button>
+            </div>
+          </CardFooter>
+        )}
+      </Card>
+
+      {/* Grouped Student Fee Assignments Modal */}
+      <Dialog open={!!selectedStudentForModal} onOpenChange={(open) => !open && setSelectedStudentForModal(null)}>
+        <DialogContent className="w-[92vw] max-w-[92vw] sm:max-w-2xl max-h-[85vh] flex flex-col overflow-hidden p-0 rounded-2xl border border-border/80 shadow-2xl">
+          {selectedStudentForModal && (
+            <>
+              {/* Modal Header */}
+              <div className="p-4 sm:p-6 pb-4 border-b bg-muted/30 relative">
+                <div className="flex flex-col gap-1 pr-6">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground leading-tight">
+                    {selectedStudentForModal.student.name}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-1">
+                    <span className="font-mono font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded text-[11px]">
+                      {selectedStudentForModal.student.usn}
+                    </span>
+                    <span className="text-muted-foreground/40">•</span>
+                    <span className="font-medium text-foreground/80">{selectedStudentForModal.student.department}</span>
+                    <span className="text-muted-foreground/40">•</span>
+                    <span className="font-medium text-muted-foreground">
+                      Sem {selectedStudentForModal.student.semester} ({selectedStudentForModal.student.section})
+                    </span>
+                    {selectedStudentForModal.student.batch && (
+                      <>
+                        <span className="text-muted-foreground/40">•</span>
+                        <span className="font-medium text-muted-foreground">{selectedStudentForModal.student.batch}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-3.5 flex-1 bg-background">
+                {/* Summary Banner */}
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-muted/40 border border-border/80 dark:border-border/70 text-xs font-semibold">
+                  <span className="text-muted-foreground font-medium">
+                    Assigned Fee Templates ({selectedStudentForModal.assignments.length})
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">
+                    Total: <span className="text-green-600 dark:text-green-400 font-bold">{formatCurrency(selectedStudentForModal.assignments.reduce((sum, a) => sum + (a.template.total_amount || 0), 0))}</span>
+                  </span>
+                </div>
+
+                {/* Assignments List */}
+                <div className="space-y-3">
+                  {selectedStudentForModal.assignments.map((assignment) => (
+                    <div
+                      key={assignment.id}
+                      className="p-4 rounded-xl border border-border/80 dark:border-border/70 bg-card hover:border-primary/50 shadow-sm transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    >
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm sm:text-base text-foreground">
+                            {assignment.template.name}
+                          </span>
+                          <Badge variant="secondary" className="text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 border border-border/50">
+                            {assignment.template.fee_type}
+                          </Badge>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <Calendar className="h-3.5 w-3.5 text-primary/70" />
+                            <span>Assigned: <strong className="text-foreground/90">{formatDate(assignment.assigned_at)}</strong></span>
+                          </div>
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <Calendar className="h-3.5 w-3.5 text-destructive/70" />
+                            <span>Due: <strong className="text-foreground/90">{assignment.due_date ? formatDate(assignment.due_date) : '-'}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-5 pt-3 sm:pt-0 border-t sm:border-t-0 border-border/60">
+                        <div className="text-right">
+                          <div className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">Amount</div>
+                          <div className="font-bold text-green-600 dark:text-green-400">
+                            {formatCurrency(assignment.template.total_amount)}
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full transition-all active:scale-95"
+                          title="Delete Assignment"
+                          onClick={() => {
+                            handleDelete(assignment.id);
+                            setSelectedStudentForModal(prev => {
+                              if (!prev) return null;
+                              const updated = prev.assignments.filter(a => a.id !== assignment.id);
+                              if (updated.length === 0) return null;
+                              return { ...prev, assignments: updated };
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>);
+
+};
+
+export default IndividualFeeAssignment;
+
+
+
+
+
+
+
+
+
+
+

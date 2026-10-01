@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Stalight Campus</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.stalight.campus</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>stalightcampus</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>This app requires camera access to take profile photos and capture attachments.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Stalight Campus uses your location to monitor the configured campus boundary and detect campus entry or exit events even when the app is not in use, enabling real-time out-of-bounds safety alerts.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Stalight Campus uses your location to monitor the configured campus boundary and detect campus entry or exit events even when the app is not in use, enabling real-time out-of-bounds safety alerts.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Stalight Campus uses your location to monitor the configured campus boundary and provide campus geofence features.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app allows users to save photos to their library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app allows users to upload profile photos and attachments.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<!-- REQUIRED: enables CLCircularRegion geofence delivery after app kill/force-close.
+		     Without this key, iOS never relaunches the app for geofence events and
+		     never sets launchOptions[.location] in didFinishLaunchingWithOptions. -->
+		<string>location</string>
+		<!-- Allows iOS to schedule deferred background wakeups (e.g. to retry a
+		     failed geofence ping when connectivity is restored). -->
+		<string>fetch</string>
+	</array>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,778 @@
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Phone, Mail, Clock, Calendar as CalendarIcon, CheckCircle2, User as UserIcon, AlertCircle, PhoneCall, MessageCircle, FileText, Edit2, Search, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { crmApi, Lead, LeadActivity, LeadTask } from '../../api/crm_api';
+import { API_ENDPOINT } from '../../utils/config';
+import { fetchWithTokenRefresh } from '../../utils/authService';
+import { SkeletonForm } from '../ui/skeleton';
+
+// --- Color helpers ---
+const getTaskUrgency = (task: LeadTask) => {
+  if (task.is_completed) return 'completed';
+  const now = new Date();
+  const due = new Date(task.due_date);
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  if (due < now) return 'overdue';
+  if (due < todayEnd) return 'today';
+  const in3days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  if (due < in3days) return 'soon';
+  return 'upcoming';
+};
+
+const taskUrgencyStyles = {
+  overdue:   { border: 'border-l-red-500',    bg: 'bg-red-50 dark:bg-red-950/20',     badge: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',     icon: AlertCircle, iconClass: 'text-red-500',    label: 'Overdue' },
+  today:     { border: 'border-l-orange-500', bg: 'bg-orange-50 dark:bg-orange-950/20', badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300', icon: Clock, iconClass: 'text-orange-500', label: 'Due Today' },
+  soon:      { border: 'border-l-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-950/20', badge: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300', icon: Clock, iconClass: 'text-yellow-600', label: 'Due Soon' },
+  upcoming:  { border: 'border-l-blue-500',   bg: 'bg-blue-50 dark:bg-blue-950/20',   badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',     icon: CalendarIcon, iconClass: 'text-blue-500', label: 'Upcoming' },
+  completed: { border: 'border-l-green-500',  bg: 'bg-green-50 dark:bg-green-950/20', badge: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',   icon: CheckCircle2, iconClass: 'text-green-500', label: 'Done' },
+};
+
+const activityTypeStyles: Record<string, { dot: string; badge: string; icon: React.ElementType }> = {
+  call:      { dot: 'bg-green-500',   badge: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',   icon: PhoneCall },
+  email:     { dot: 'bg-blue-500',    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',       icon: Mail },
+  whatsapp:  { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300', icon: MessageCircle },
+  note:      { dot: 'bg-purple-500',  badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300', icon: FileText },
+  meeting:   { dot: 'bg-indigo-500',  badge: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300', icon: UserIcon },
+};
+
+interface LeadDetailsViewProps {
+  leadId: number | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onLeadUpdated?: () => void;
+  userRole?: string;
+}
+
+const LeadDetailsView: React.FC<LeadDetailsViewProps> = ({ leadId, isOpen, onClose, onLeadUpdated, userRole }) => {
+  const [lead, setLead] = useState<Lead | null>(null);
+  const [activities, setActivities] = useState<LeadActivity[]>([]);
+  const [tasks, setTasks] = useState<LeadTask[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [isEditingCourse, setIsEditingCourse] = useState(false);
+  const [updatingCourse, setUpdatingCourse] = useState(false);
+  // New Task Form
+  const [newTaskType, setNewTaskType] = useState('call');
+  const [newTaskDesc, setNewTaskDesc] = useState('');
+  const [newTaskDate, setNewTaskDate] = useState('');
+  const [submittingTask, setSubmittingTask] = useState(false);
+
+  const getCurrentTime = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    const period = hours >= 12 ? "PM" : "AM";
+    if (hours === 0) {
+      hours = 12;
+    } else if (hours > 12) {
+      hours -= 12;
+    }
+    return {
+      hour: String(hours).padStart(2, '0'),
+      minute: String(now.getMinutes()).padStart(2, '0'),
+      period
+    };
+  };
+
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedHour, setSelectedHour] = useState<string>(() => getCurrentTime().hour);
+  const [selectedMinute, setSelectedMinute] = useState<string>(() => getCurrentTime().minute);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(() => getCurrentTime().period);
+
+  useEffect(() => {
+    if (selectedDate) {
+      let hourNum = parseInt(selectedHour, 10);
+      if (selectedPeriod === "PM" && hourNum < 12) {
+        hourNum += 12;
+      } else if (selectedPeriod === "AM" && hourNum === 12) {
+        hourNum = 0;
+      }
+
+      const combinedDate = new Date(selectedDate);
+      combinedDate.setHours(hourNum);
+      combinedDate.setMinutes(parseInt(selectedMinute, 10));
+
+      const year = combinedDate.getFullYear();
+      const month = String(combinedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(combinedDate.getDate()).padStart(2, '0');
+      const hh = String(combinedDate.getHours()).padStart(2, '0');
+      const mm = String(combinedDate.getMinutes()).padStart(2, '0');
+      setNewTaskDate(`${year}-${month}-${day}T${hh}:${mm}`);
+    } else {
+      setNewTaskDate('');
+    }
+  }, [selectedDate, selectedHour, selectedMinute, selectedPeriod]);
+
+  // New Activity Form
+  const [newActivityType, setNewActivityType] = useState('note');
+  const [newActivityDesc, setNewActivityDesc] = useState('');
+  const [submittingActivity, setSubmittingActivity] = useState(false);
+  
+  // Assignment
+  const [counsellors, setCounsellors] = useState<any[]>([]);
+  const [assigning, setAssigning] = useState(false);
+  const [counsellorPage, setCounsellorPage] = useState(1);
+  const [counsellorTotalPages, setCounsellorTotalPages] = useState(1);
+  const [counsellorSearch, setCounsellorSearch] = useState("");
+  const [isCounsellorOpen, setIsCounsellorOpen] = useState(false);
+  
+  const [coursePage, setCoursePage] = useState(1);
+  const [courseTotalPages, setCourseTotalPages] = useState(1);
+  const [courseSearch, setCourseSearch] = useState("");
+  const [isCourseOpen, setIsCourseOpen] = useState(false);
+  const isManager = userRole === 'admission_manager' || userRole === 'org_admin' || userRole === 'superadmin' || userRole === 'principal';
+
+  useEffect(() => {
+    if (leadId && isOpen) {
+      fetchLeadData();
+    } else {
+      setLead(null);
+      setActivities([]);
+      setTasks([]);
+      setIsEditingCourse(false);
+    }
+  }, [leadId, isOpen, isManager]);
+
+  useEffect(() => {
+    if (isOpen && isManager) {
+      fetchCounsellors(counsellorPage, counsellorSearch);
+    }
+  }, [counsellorPage, counsellorSearch, isOpen, isManager]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchCourses(coursePage, courseSearch);
+    }
+  }, [coursePage, courseSearch, isOpen]);
+
+  const fetchCourses = async (page = coursePage, search = courseSearch) => {
+    try {
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admission/manager/courses/?page=${page}&page_size=10&search=${encodeURIComponent(search)}`);
+      const data = await response.json();
+      if (response.ok) {
+        setCourses(
+          Array.isArray(data.results) ? data.results 
+          : Array.isArray(data) ? data 
+          : []
+        );
+        setCourseTotalPages(data.total_pages || 1);
+        setCoursePage(data.current_page || page);
+      }
+    } catch (err) {
+      console.error("Failed to fetch courses", err);
+    }
+  };
+
+  const fetchCounsellors = async (page = counsellorPage, search = counsellorSearch) => {
+    try {
+      const response = await fetchWithTokenRefresh(`${API_ENDPOINT}/admin/users/?role=counsellor&page=${page}&page_size=10&search=${encodeURIComponent(search)}`);
+      const data = await response.json();
+      if (response.ok) {
+        setCounsellors(
+          Array.isArray(data.users) ? data.users 
+          : Array.isArray(data.results) ? data.results 
+          : Array.isArray(data) ? data 
+          : []
+        );
+        setCounsellorTotalPages(data.total_pages || 1);
+        setCounsellorPage(data.current_page || page);
+      } else {
+        console.error("Failed to load counsellors", data);
+        setCounsellors([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch counsellors", err);
+    }
+  };
+
+  const fetchLeadData = async () => {
+    setLoading(true);
+    try {
+      if (!leadId) return;
+      const leadRes = await crmApi.getLead(leadId);
+      setLead(leadRes.data);
+      setActivities(leadRes.data.activities || []);
+      setTasks(leadRes.data.tasks || []);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load lead details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leadId || !newTaskDesc || !newTaskDate) return;
+    
+    const taskDate = new Date(newTaskDate);
+    if (taskDate < new Date()) {
+      toast.error('Due time cannot be in the past');
+      return;
+    }
+    
+    setSubmittingTask(true);
+    try {
+      await crmApi.createTask({
+        enquiry: leadId,
+        task_type: newTaskType,
+        description: newTaskDesc,
+        due_date: newTaskDate,
+        assigned_to: lead?.assigned_to // By default, assign to the lead's counsellor
+      });
+      toast.success('Task created successfully');
+      setNewTaskDesc('');
+      setNewTaskDate('');
+      setSelectedDate(undefined);
+      const currentTime = getCurrentTime();
+      setSelectedHour(currentTime.hour);
+      setSelectedMinute(currentTime.minute);
+      setSelectedPeriod(currentTime.period);
+      fetchLeadData();
+      if (onLeadUpdated) onLeadUpdated();
+    } catch (error) {
+      toast.error('Failed to create task');
+    } finally {
+      setSubmittingTask(false);
+    }
+  };
+
+  const handleCreateActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leadId || !newActivityDesc) return;
+    
+    setSubmittingActivity(true);
+    try {
+      await crmApi.createActivity({
+        enquiry: leadId,
+        activity_type: newActivityType,
+        description: newActivityDesc
+      });
+      toast.success('Activity logged successfully');
+      setNewActivityDesc('');
+      fetchLeadData();
+      if (onLeadUpdated) onLeadUpdated();
+    } catch (error) {
+      toast.error('Failed to log activity');
+    } finally {
+      setSubmittingActivity(false);
+    }
+  };
+
+  const handleMarkTaskDone = async (taskId: number) => {
+    try {
+      await crmApi.markTaskCompleted(taskId);
+      toast.success('Task marked as completed');
+      fetchLeadData();
+      if (onLeadUpdated) onLeadUpdated();
+    } catch (error) {
+      toast.error('Failed to complete task');
+    }
+  };
+
+  const handleAssignCounsellor = async (counsellorIdStr: string) => {
+    if (!leadId) return;
+    setAssigning(true);
+    try {
+      await crmApi.assignCounsellor(leadId, parseInt(counsellorIdStr));
+      toast.success("Lead assigned successfully!");
+      fetchLeadData();
+      if (onLeadUpdated) onLeadUpdated();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to assign lead");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleUpdateCourse = async (courseIdStr: string) => {
+    if (!leadId) return;
+    setUpdatingCourse(true);
+    try {
+      await crmApi.updateLead(leadId, { course_interested: courseIdStr === 'none' ? null : parseInt(courseIdStr) });
+      toast.success("Interested course updated!");
+      setIsEditingCourse(false);
+      fetchLeadData();
+      if (onLeadUpdated) onLeadUpdated();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update course");
+    } finally {
+      setUpdatingCourse(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+        {loading || !lead ? (
+          <div className="p-6">
+            <DialogTitle className="sr-only">Loading Lead</DialogTitle>
+            <DialogDescription className="sr-only">Loading lead data...</DialogDescription>
+            <SkeletonForm fields={4} />
+          </div>
+        ) : (
+          <div className="flex flex-col h-full gap-6">
+            <DialogHeader className="pb-4 border-b">
+              <div className="flex justify-between items-start">
+                <div>
+                  <DialogTitle className="text-2xl">{lead.name}</DialogTitle>
+                  <DialogDescription className="sr-only">Lead details and priority</DialogDescription>
+                  <div className="text-base flex items-center gap-2 mt-1">
+                    <Badge variant={lead.priority === 'hot' ? 'destructive' : lead.priority === 'warm' ? 'default' : 'secondary'}>
+                      {lead.priority.toUpperCase()}
+                    </Badge>
+                    <Badge variant="outline">{lead.status.replace('_', ' ').toUpperCase()}</Badge>
+                  </div>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Left Column: Profile */}
+              <div className="md:col-span-1 space-y-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Contact Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Mail className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="text-sm overflow-hidden">
+                        <p className="text-muted-foreground text-xs">Email</p>
+                        <p className="font-medium truncate" title={lead.email}>{lead.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Phone className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="text-sm">
+                        <p className="text-muted-foreground text-xs">Phone</p>
+                        <p className="font-medium">{lead.phone}</p>
+                      </div>
+                    </div>
+                    <div className="pt-3 border-t">
+                      <p className="text-muted-foreground text-xs mb-1">Interested Course</p>
+                      {isEditingCourse || !lead.course_name ? (
+                        <Popover open={isCourseOpen} onOpenChange={setIsCourseOpen} modal={true}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between font-normal h-8 text-sm px-3 bg-muted/30" disabled={updatingCourse}>
+                              <span className="truncate">
+                                {courses.find(c => c.id.toString() === lead.course_id?.toString())?.name || lead.course_name || "Select Course"}
+                              </span>
+                              <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <div className="flex items-center border-b px-3">
+                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                              <input 
+                                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                placeholder="Search course..."
+                                value={courseSearch}
+                                onChange={(e) => {
+                                  setCourseSearch(e.target.value);
+                                  setCoursePage(1);
+                                }}
+                              />
+                            </div>
+                            <div className="max-h-[250px] overflow-y-auto p-1 custom-scrollbar">
+                              <div 
+                                className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                                onClick={() => {
+                                  handleUpdateCourse("none");
+                                  setIsCourseOpen(false);
+                                }}
+                              >
+                                <CheckCircle2 className={cn("mr-2 h-4 w-4", !lead.course_id ? "opacity-100" : "opacity-0")} />
+                                No Course Selected
+                              </div>
+                              {courses.length === 0 ? (
+                                <p className="p-4 text-center text-sm text-muted-foreground">No courses found.</p>
+                              ) : (
+                                courses.map(c => (
+                                  <div 
+                                    key={c.id}
+                                    className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                                    onClick={() => {
+                                      handleUpdateCourse(c.id.toString());
+                                      setIsCourseOpen(false);
+                                    }}
+                                  >
+                                    <CheckCircle2 className={cn("mr-2 h-4 w-4", lead.course_id?.toString() === c.id.toString() ? "opacity-100" : "opacity-0")} />
+                                    {c.name}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between border-t p-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setCoursePage(p => Math.max(1, p - 1))}
+                                disabled={coursePage <= 1}
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                              </Button>
+                              <span className="text-xs text-muted-foreground">
+                                Page {coursePage} of {courseTotalPages}
+                              </span>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setCoursePage(p => Math.min(courseTotalPages, p + 1))}
+                                disabled={coursePage >= courseTotalPages}
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <div className="flex items-center justify-between group">
+                          <p className="font-medium text-sm">{lead.course_name}</p>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" 
+                            onClick={() => setIsEditingCourse(true)}
+                          >
+                            <Edit2 className="h-3 w-3 text-muted-foreground hover:text-primary" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Assign Counsellor Card */}
+                {(lead.assigned_to_name || isManager) && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Assign Counsellor</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {lead.assigned_to_name && !isManager ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded-md w-full">
+                          <UserIcon className="w-4 h-4" />
+                          <span>{lead.assigned_to_name}</span>
+                        </div>
+                      ) : isManager ? (
+                        <Popover open={isCounsellorOpen} onOpenChange={setIsCounsellorOpen} modal={true}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between font-normal h-10 px-3 bg-background" disabled={assigning}>
+                              {lead.assigned_to_name || "Assign Counsellor"}
+                              <ChevronDown className="h-4 w-4 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <div className="flex items-center border-b px-3">
+                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                              <input 
+                                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                placeholder="Search counsellor..."
+                                value={counsellorSearch}
+                                onChange={(e) => {
+                                  setCounsellorSearch(e.target.value);
+                                  setCounsellorPage(1);
+                                }}
+                              />
+                            </div>
+                            <div className="max-h-[250px] overflow-y-auto p-1 custom-scrollbar">
+                              {counsellors.length === 0 ? (
+                                <p className="p-4 text-center text-sm text-muted-foreground">No counsellors found.</p>
+                              ) : (
+                                counsellors.map(c => (
+                                  <div 
+                                    key={c.id}
+                                    className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                                    onClick={() => {
+                                      handleAssignCounsellor(c.id.toString());
+                                      setIsCounsellorOpen(false);
+                                    }}
+                                  >
+                                    <CheckCircle2 className={cn("mr-2 h-4 w-4", lead.assigned_to?.toString() === c.id.toString() ? "opacity-100" : "opacity-0")} />
+                                    {c.first_name} {c.last_name}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between border-t p-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setCounsellorPage(p => Math.max(1, p - 1))}
+                                disabled={counsellorPage <= 1}
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                              </Button>
+                              <span className="text-xs text-muted-foreground">
+                                Page {counsellorPage} of {counsellorTotalPages}
+                              </span>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setCounsellorPage(p => Math.min(counsellorTotalPages, p + 1))}
+                                disabled={counsellorPage >= counsellorTotalPages}
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* Right Column: Timeline & Tasks */}
+              <div className="md:col-span-2">
+                <Tabs defaultValue="tasks" className="w-full">
+                  <TabsList className="w-full grid grid-cols-2">
+                    <TabsTrigger value="tasks">Follow-up Tasks</TabsTrigger>
+                    <TabsTrigger value="activity">Activity Timeline</TabsTrigger>
+                  </TabsList>
+                  
+                  {/* Tasks Tab */}
+                  <TabsContent value="tasks" className="space-y-4 mt-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm">Add New Task</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <form onSubmit={handleCreateTask} className="space-y-3">
+                          <div className="flex gap-2">
+                            <Select value={newTaskType} onValueChange={setNewTaskType}>
+                              <SelectTrigger className="w-[120px]">
+                                <SelectValue placeholder="Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="call">Call</SelectItem>
+                                <SelectItem value="email">Email</SelectItem>
+                                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                                <SelectItem value="meeting">Meeting</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className={cn(
+                                    "flex-1 justify-start text-left font-normal border-input bg-background hover:bg-accent hover:text-accent-foreground",
+                                    !selectedDate && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {selectedDate ? (
+                                    format(selectedDate, "PPP")
+                                  ) : (
+                                    <span>Pick due date</span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0 bg-popover text-popover-foreground border shadow-md" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={selectedDate}
+                                  onSelect={setSelectedDate}
+                                  initialFocus
+                                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Due Time</span>
+                            <div className="flex items-center gap-1.5">
+                              {/* Hour Select */}
+                              <Select value={selectedHour} onValueChange={setSelectedHour}>
+                                <SelectTrigger className="w-[70px] h-8 text-xs bg-background text-foreground border-input">
+                                  <SelectValue placeholder="12" />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-48 overflow-y-auto bg-popover text-popover-foreground border shadow-md">
+                                  {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
+                                    <SelectItem key={h} value={h} className="text-xs">
+                                      {h}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              <span className="text-muted-foreground text-xs font-semibold">:</span>
+
+                              {/* Minute Select */}
+                              <Select value={selectedMinute} onValueChange={setSelectedMinute}>
+                                <SelectTrigger className="w-[70px] h-8 text-xs bg-background text-foreground border-input">
+                                  <SelectValue placeholder="00" />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-48 overflow-y-auto bg-popover text-popover-foreground border shadow-md">
+                                  {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')).map((m) => (
+                                    <SelectItem key={m} value={m} className="text-xs">
+                                      {m}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              {/* Period Select */}
+                              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                                <SelectTrigger className="w-[70px] h-8 text-xs bg-background text-foreground border-input">
+                                  <SelectValue placeholder="PM" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-popover text-popover-foreground border shadow-md">
+                                  <SelectItem value="AM" className="text-xs">AM</SelectItem>
+                                  <SelectItem value="PM" className="text-xs">PM</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <Textarea 
+                            placeholder="Task description..." 
+                            value={newTaskDesc}
+                            onChange={e => setNewTaskDesc(e.target.value)}
+                            className="resize-none"
+                            rows={2}
+                            required
+                          />
+                          <Button type="submit" size="sm" disabled={submittingTask} className="w-full">
+                            {submittingTask ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                            Create Task
+                          </Button>
+                        </form>
+                      </CardContent>
+                    </Card>
+
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm text-muted-foreground px-1">Upcoming & Pending Tasks</h4>
+                      {tasks.filter(t => !t.is_completed).length === 0 ? (
+                        <div className="text-center p-4 border border-dashed rounded-md text-sm text-muted-foreground bg-muted/20">
+                          No pending tasks
+                        </div>
+                      ) : (
+                        tasks.filter(t => !t.is_completed).map(task => {
+                          const urgency = getTaskUrgency(task);
+                          const style = taskUrgencyStyles[urgency];
+                          const UrgencyIcon = style.icon;
+                          return (
+                          <div key={task.id} className={`flex items-start gap-3 p-3 border-l-4 rounded-md shadow-sm ${style.border} ${style.bg}`}>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="w-6 h-6 rounded-full shrink-0" 
+                              onClick={() => handleMarkTaskDone(task.id)}
+                            >
+                              <CheckCircle2 className="w-4 h-4 text-muted-foreground hover:text-green-500" />
+                            </Button>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium">{task.description}</p>
+                              <div className="flex items-center gap-2 mt-1 text-xs">
+                                <Badge variant="secondary" className="text-[10px] px-1 py-0">{task.task_type}</Badge>
+                                <span className={`flex items-center gap-1 font-medium text-[10px] px-1.5 py-0.5 rounded-full ${style.badge}`}>
+                                  <UrgencyIcon className={`w-3 h-3 ${style.iconClass}`}/> {style.label}
+                                </span>
+                                <span className="flex items-center gap-1 text-muted-foreground"><Clock className="w-3 h-3"/> {new Date(task.due_date).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* Activity Tab */}
+                  <TabsContent value="activity" className="space-y-4 mt-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm">Log Activity</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <form onSubmit={handleCreateActivity} className="space-y-3">
+                          <Select value={newActivityType} onValueChange={setNewActivityType}>
+                            <SelectTrigger className="w-[140px]">
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="call">Call Log</SelectItem>
+                              <SelectItem value="email">Email Sent</SelectItem>
+                              <SelectItem value="whatsapp">WhatsApp Msg</SelectItem>
+                              <SelectItem value="note">Internal Note</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Textarea 
+                            placeholder="Activity details or notes..." 
+                            value={newActivityDesc}
+                            onChange={e => setNewActivityDesc(e.target.value)}
+                            className="resize-none"
+                            rows={2}
+                            required
+                          />
+                          <Button type="submit" size="sm" disabled={submittingActivity} className="w-full">
+                            {submittingActivity ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                            Log Activity
+                          </Button>
+                        </form>
+                      </CardContent>
+                    </Card>
+
+                    <div className="space-y-0 relative border-l-2 border-muted ml-3 pl-4 py-2">
+                      {activities.length === 0 ? (
+                        <div className="text-sm text-muted-foreground py-2">No activity logged yet.</div>
+                      ) : (
+                        activities.map((activity) => {
+                          const style = activityTypeStyles[activity.activity_type] || activityTypeStyles['note'];
+                          const ActivityIcon = style.icon;
+                          return (
+                          <div key={activity.id} className="relative mb-6 last:mb-0">
+                            <div className="absolute -left-[23px] bg-background p-1 rounded-full border border-muted">
+                              <div className={`w-2 h-2 rounded-full ${style.dot}`} />
+                            </div>
+                            <div className="pl-1">
+                              <p className="text-sm font-medium">{activity.description}</p>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+                                <span className={`flex items-center gap-1 font-medium text-[10px] px-1.5 py-0.5 rounded-full ${style.badge}`}>
+                                  <ActivityIcon className="w-3 h-3" />
+                                  {activity.activity_type.replace('_', ' ')}
+                                </span>
+                                <span>{new Date(activity.created_at).toLocaleString()}</span>
+                                <span className="text-muted-foreground/70">by {activity.created_by_name}</span>
+                              </div>
+                            </div>
+                          </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default LeadDetailsView;
