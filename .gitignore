@@ -67,7 +67,6 @@ opencode.jsonc
 crg-session-start.sh
 crg-updates.sh
 skills/
-hooks/
 AGENTS.md
 CODEBUDDY.md
 CLAUDE.md
