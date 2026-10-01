@@ -1227,11 +1227,11 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
                     variant="ghost"
                     className={`w-full justify-start gap-3 h-10.5 rounded-lg transition-all duration-150 relative text-xs font-medium ${isItemActive(item.page)
                       ? theme === 'dark'
-                        ? "bg-primary/20 text-primary font-semibold border-l-4 border-primary shadow-sm"
-                        : "bg-[#0F3F73] hover:bg-[#0C3562] text-white font-semibold border-l-4 border-amber-400 shadow-md shadow-[#0F3F73]/20"
+                        ? "bg-primary/20 text-primary hover:text-primary hover:bg-primary/30 font-semibold border-l-4 border-primary shadow-sm"
+                        : "bg-[#0F3F73] hover:bg-[#0C3562] text-white hover:text-white font-semibold border-l-4 border-amber-400 shadow-md shadow-[#0F3F73]/20"
                       : theme === 'dark'
                         ? "text-slate-300 hover:text-white hover:bg-slate-800/70"
-                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                        : "text-slate-700 hover:text-[#0F3F73] hover:bg-slate-100"
                       } ${collapsed ? "px-2 justify-center" : "px-3"}`}
                     onClick={() => handlePageChange(item.page)}
                   >

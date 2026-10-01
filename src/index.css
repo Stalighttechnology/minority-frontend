@@ -35,6 +35,21 @@ body {
   border: none !important;
 }
 
+/* Global Government Theme: Sidebar & Active Button Hover Contrast Protection */
+button.bg-\[\#0F3F73\],
+button.bg-\[\#0F3F73\]:hover,
+button.bg-\[\#0F3F73\]:focus,
+.bg-\[\#0F3F73\]:hover,
+.bg-\[\#0F3F73\]:focus {
+  color: #ffffff !important;
+}
+
+button.bg-\[\#0F3F73\] svg,
+button.bg-\[\#0F3F73\]:hover svg,
+.bg-\[\#0F3F73\]:hover svg {
+  color: #ffffff !important;
+}
+
 @layer base {
   :root {
     --safe-area-inset-top: 0px;
