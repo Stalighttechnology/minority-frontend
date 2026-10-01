@@ -821,7 +821,7 @@ const AdminAnnouncementManagement = () => {
                             <SelectContent className={theme === 'dark' ? 'bg-card border-border text-foreground' : 'bg-white text-gray-900'}>
                               <SelectItem value="vtu" className="text-xs">VTU Circular</SelectItem>
                               <SelectItem value="university" className="text-xs">University Notification</SelectItem>
-                              <SelectItem value="exam" className="text-xs">Examination / COE</SelectItem>
+                              <SelectItem value="exam" className="text-xs">Examination</SelectItem>
                               <SelectItem value="academic" className="text-xs">Academic Calendar</SelectItem>
                               <SelectItem value="govt" className="text-xs">Government / AICTE</SelectItem>
                               <SelectItem value="internal" className="text-xs">Internal / Office Order</SelectItem>

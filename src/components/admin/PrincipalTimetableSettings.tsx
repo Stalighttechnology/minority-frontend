@@ -459,7 +459,7 @@ export default function PrincipalTimetableSettings() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingSlot, setEditingSlot] = useState<TimetableSlot | null>(null);
 
-  const [approvalChain, setApprovalChain] = useState<string[]>(['hod', 'principal', 'coe']);
+  const [approvalChain, setApprovalChain] = useState<string[]>(['hod', 'principal']);
   const [chainLoading, setChainLoading] = useState(false);
   const [chainSaving, setChainSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'timetable' | 'qp-workflow' | 'attendance-workflow' | 'leave-policy'>('timetable');
@@ -606,10 +606,10 @@ export default function PrincipalTimetableSettings() {
   const [attendanceSaving, setAttendanceSaving] = useState(false);
 
   const PRESETS: Record<string, string[]> = {
-    "Common": ["hod", "coe", "principal"],
-    "Standard": ["hod", "principal", "coe"],
+    "Common": ["hod", "principal"],
+    "Standard": ["hod", "principal", "dean"],
     "Short": ["hod", "principal"],
-    "Extended": ["hod", "principal", "coe", "dean"],
+    "Extended": ["hod", "principal", "dean"],
   };
 
   const AVAILABLE_ROLES = [
@@ -619,7 +619,6 @@ export default function PrincipalTimetableSettings() {
     { value: 'hod', label: translateTerminology('HOD') },
     { value: 'dean', label: 'Dean' },
     { value: 'principal', label: 'Principal' },
-    { value: 'coe', label: 'COE' },
     { value: 'org_admin', label: 'Org Admin' },
     { value: 'admission_manager', label: 'Admission Manager' },
     { value: 'fees_manager', label: 'Fees Manager' },
@@ -668,7 +667,7 @@ export default function PrincipalTimetableSettings() {
       const res = await fetchWithTokenRefresh(`${API_ENDPOINT}/organizations/qp-approval-chain/`);
       if (res.ok) {
         const data = await res.json();
-        setApprovalChain(data.qp_approval_chain || ['hod', 'principal', 'coe']);
+        setApprovalChain(data.qp_approval_chain || ['hod', 'principal']);
       }
     } catch (err) {
       console.error(err);
@@ -3174,7 +3173,6 @@ export default function PrincipalTimetableSettings() {
                             admission_manager: 'Admission Mgr',
                             hms_admin: 'HMS Admin',
                             transport_admin: 'Transport Admin',
-                            coe: 'COE',
                             fees_manager: 'Fees Mgr'
                           };
 

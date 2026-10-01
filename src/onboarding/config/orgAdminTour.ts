@@ -100,7 +100,7 @@ export const orgAdminTour: Step[] = [
     target: '#sidebar-enroll-user',
     title: 'Enroll Staff',
     content:
-      'Enroll and onboard new institutional roles (HODs, faculty members, Deans, COE, or Fees Managers) easily.',
+      'Enroll and onboard new institutional roles (HODs, faculty members, Deans, or Fees Managers) easily.',
     placement: 'right' as const,
     disableBeacon: true,
     route: '/org-admin/enroll-user',

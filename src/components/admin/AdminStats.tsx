@@ -231,10 +231,10 @@ const AdminStats = ({ setError, onNavigate }: AdminStatsProps) => {
   ];
 
   if (userTier >= 2) {
-    roleLabels.push("COE", "Fees Managers");
-    roleData.push(stats?.role_distribution?.coe || 0, stats?.role_distribution?.fees_managers || 0);
-    roleBgColor.push("rgba(34, 197, 94, 0.6)", "rgba(249, 115, 22, 0.6)");
-    roleBorderColor.push("rgba(34, 197, 94, 1)", "rgba(249, 115, 22, 1)");
+    roleLabels.push("Fees Managers");
+    roleData.push(stats?.role_distribution?.fees_managers || 0);
+    roleBgColor.push("rgba(249, 115, 22, 0.6)");
+    roleBorderColor.push("rgba(249, 115, 22, 1)");
   }
 
   // Pie chart data for role distribution
@@ -334,13 +334,6 @@ const AdminStats = ({ setError, onNavigate }: AdminStatsProps) => {
             description={translateTerminology("Dept heads")}
             icon={<FaUserTie className={theme === 'dark' ? "text-yellow-400 text-3xl" : "text-yellow-500 text-3xl"} />} />
 
-          {userTier >= 2 && (
-            <DashboardCard
-              title="COE"
-              value={stats.total_coe || 0}
-              description="Exams controller"
-              icon={<FaUserCheck className={theme === 'dark' ? "text-green-400 text-3xl" : "text-green-500 text-3xl"} />} />
-          )}
 
           <DashboardCard
             title="Principals"

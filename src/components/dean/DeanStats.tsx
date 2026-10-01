@@ -151,8 +151,11 @@ const DeanStats = () => {
   if (roleDistribution) {
     Object.keys(roleDistribution).forEach(key => {
       const lowerKey = key.toLowerCase();
+      if (lowerKey.includes('coe')) {
+        return; // skip coe
+      }
       if (userTier === 1) {
-        if (lowerKey.includes('coe') || lowerKey.includes('fees') || lowerKey.includes('manager') || lowerKey.includes('admin') && !lowerKey.includes('org')) {
+        if (lowerKey.includes('fees') || lowerKey.includes('manager') || (lowerKey.includes('admin') && !lowerKey.includes('org'))) {
           return; // skip unsupported roles
         }
       }
@@ -291,14 +294,7 @@ const DeanStats = () => {
                   description={translateTerminology("Coordinators")}
                   icon={<FaUserTie className={theme === 'dark' ? 'text-yellow-400 text-3xl' : 'text-yellow-500 text-3xl'} />}
                 />
-                {userTier >= 2 && (
-                  <DashboardCard
-                    title="COE"
-                    value={totalCoe}
-                    description="Exams controller"
-                    icon={<FaUserCheck className={theme === 'dark' ? 'text-green-400 text-3xl' : 'text-green-500 text-3xl'} />}
-                  />
-                )}
+
                 <DashboardCard
                   title="Principals"
                   value={totalPrincipals}

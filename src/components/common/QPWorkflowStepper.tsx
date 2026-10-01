@@ -20,14 +20,14 @@ const getRoleLabel = (role: string): string => {
 };
 
 export const QPWorkflowStepper: React.FC<QPWorkflowStepperProps> = ({
-  chain = ['hod', 'coe', 'principal'],
+  chain = ['hod', 'principal'],
   currentStatus = '',
   className = '',
 }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  const normalizedChain = chain && chain.length > 0 ? chain : ['hod', 'coe', 'principal'];
+  const normalizedChain = chain && chain.length > 0 ? chain : ['hod', 'principal'];
   const status = (currentStatus || '').toLowerCase();
 
   // Extract active role from status (e.g. "pending_hod" -> "hod", "pending_principal" -> "principal")

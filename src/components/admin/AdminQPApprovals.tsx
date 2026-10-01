@@ -266,7 +266,7 @@ const AdminQPApprovals = ({ role = "principal" }: AdminQPApprovalsProps) => {
   const [isHistoryView, setIsHistoryView] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [activeTab, setActiveTab] = useState("pending");
-  const [approvalChain, setApprovalChain] = useState<string[]>(['hod', 'principal', 'coe']);
+  const [approvalChain, setApprovalChain] = useState<string[]>(['hod', 'principal']);
   const { theme } = useTheme();
   const { toast } = useToast();
 
