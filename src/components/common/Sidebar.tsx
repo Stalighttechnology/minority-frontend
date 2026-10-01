@@ -106,7 +106,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
 
   const initialUserStr = sessionStorage.getItem("user") || localStorage.getItem("user");
   const initialUser = initialUserStr ? JSON.parse(initialUserStr) : null;
-  const [orgLogo, setOrgLogo] = useState(initialUser?.org_logo || "/logo.jpeg");
+  const [orgLogo, setOrgLogo] = useState(initialUser?.org_logo || "/org logo.png");
 
   const [childrenList, setChildrenList] = useState<any[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(localStorage.getItem('selectedStudentId'));
@@ -286,7 +286,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
     const handleUpdate = () => {
       const updatedUserStr = sessionStorage.getItem("user") || localStorage.getItem("user");
       const updatedUser = updatedUserStr ? JSON.parse(updatedUserStr) : null;
-      setOrgLogo(updatedUser?.org_logo || "/logo.jpeg");
+      setOrgLogo(updatedUser?.org_logo || "/org logo.png");
     };
     window.addEventListener("userProfileUpdated", handleUpdate);
     return () => window.removeEventListener("userProfileUpdated", handleUpdate);
@@ -1076,14 +1076,9 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
     >
       {/* Header */}
       <motion.div
-        className={`px-4 pb-3 lg:pb-0 flex items-center border-b ${theme === 'dark' ? 'bg-background border-border' : 'bg-white border-gray-200'}`}
+        className={`px-4 flex items-center border-b ${theme === 'dark' ? 'bg-background border-border' : 'bg-white border-gray-200'}`}
         style={{
-          height: window.innerWidth >= 768
-            ? (Capacitor.isNativePlatform() ? 'calc(5rem + env(safe-area-inset-top, 24px))' : '5rem')
-            : undefined,
-          paddingTop: Capacitor.isNativePlatform()
-            ? 'calc(env(safe-area-inset-top, 24px) + 10px)'
-            : window.innerWidth < 768 ? '16px' : '0px'
+          height: '60px',
         }}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1095,10 +1090,13 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
             style={{ borderRadius: 8 }}
           >
             <img
-              src={orgLogo}
+              src={orgLogo || "/org logo.png"}
               alt="Organization Logo"
               className="w-full h-full object-contain"
               style={{ borderRadius: '0.5rem' }}
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = "/org logo.png";
+              }}
             />
           </div>
 
@@ -1112,7 +1110,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
                 className="flex flex-col min-w-0"
               >
                 <h3 className={`font-semibold text-lg whitespace-nowrap leading-tight ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>School ERP</h3>
-                <p className={`text-[10px]  tracking-wider font-medium ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>By Stalight Technologies</p>
+                <p className={`text-[10px] tracking-wider font-semibold text-primary`}>Minority Residential School</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1226,13 +1224,15 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
                 >
                   <Button
                     id={getSidebarId(item.page)}
-                    variant={isItemActive(item.page) ? "default" : "ghost"}
-                    className={`w-full justify-start gap-3 h-10 transition-all duration-200 relative ${isItemActive(item.page)
-                      ? "bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
+                    variant="ghost"
+                    className={`w-full justify-start gap-3 h-10.5 rounded-lg transition-all duration-150 relative text-xs font-medium ${isItemActive(item.page)
+                      ? theme === 'dark'
+                        ? "bg-primary/20 text-primary font-semibold border-l-4 border-primary shadow-sm"
+                        : "bg-[#0F3F73] hover:bg-[#0C3562] text-white font-semibold border-l-4 border-amber-400 shadow-md shadow-[#0F3F73]/20"
                       : theme === 'dark'
-                        ? "text-muted-foreground hover:text-foreground hover:bg-accent"
-                        : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                      } ${collapsed ? "px-2" : "px-3"}`}
+                        ? "text-slate-300 hover:text-white hover:bg-slate-800/70"
+                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                      } ${collapsed ? "px-2 justify-center" : "px-3"}`}
                     onClick={() => handlePageChange(item.page)}
                   >
                     <motion.div
@@ -1409,7 +1409,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
       <AnimatePresence>
         {!collapsed && (
           <motion.div
-            className="fixed top-0 bottom-0 left-0 w-64 z-30 shadow-xl overflow-hidden"
+            className="absolute top-0 bottom-0 left-0 w-64 z-30 shadow-md overflow-hidden"
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}

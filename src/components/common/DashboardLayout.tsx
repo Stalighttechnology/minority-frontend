@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
+import { GovTopHeader } from "./GovTopHeader";
+import { GovFooter } from "./GovFooter";
 import { useIsMobile } from "../../hooks/use-mobile";
 import { useTheme } from "../../context/ThemeContext";
 import { logoutUser } from "../../utils/authService";
@@ -231,7 +233,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   return (
     <motion.div
-      className={`flex h-screen h-[100dvh] overflow-hidden ${theme === "dark" ?
+      className={`flex flex-col h-screen h-[100dvh] overflow-hidden ${theme === "dark" ?
         "dark bg-background text-foreground" :
         "bg-gray-50 text-gray-900"}`
       }
@@ -239,45 +241,46 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       animate={isNoAnimation ? false : { opacity: 1 }}
       transition={{ duration: 0.5 }}>
 
-      {/* Sidebar */}
-      <Sidebar
-        role={role}
-        setPage={handlePageChange}
-        activePage={activePage}
-        logout={handleLogout}
-        collapsed={sidebarCollapsed}
-        toggleCollapse={toggleSidebar} />
+      {/* 1. Official Karnataka Government Full-Width Header Banner */}
+      <GovTopHeader />
 
+      {/* 2. Main Portal Body (Sidebar + Content) */}
+      <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden relative">
+        {/* Sidebar */}
+        <Sidebar
+          role={role}
+          setPage={handlePageChange}
+          activePage={activePage}
+          logout={handleLogout}
+          collapsed={sidebarCollapsed}
+          toggleCollapse={toggleSidebar} />
 
-      {/* Main Content Area */}
-      <div
-        className={`flex-1 min-h-0 min-w-0 flex flex-col h-screen h-[100dvh] overflow-hidden transition-all duration-300 pb-[env(safe-area-inset-bottom,0px)] ${sidebarCollapsed ? 'ml-0' : 'md:ml-64'}`
-        }>
-
-        {/* Navbar */}
+        {/* Main Content Area */}
         <div
-          className={`z-10 shadow-sm transition-all duration-300 w-full`}>
+          className={`flex-1 min-h-0 min-w-0 flex flex-col h-full overflow-hidden transition-all duration-300 pb-[env(safe-area-inset-bottom,0px)] ${sidebarCollapsed ? 'ml-0' : 'md:ml-64'}`
+          }>
 
-          <Navbar
-            role={role}
-            user={user}
-            onNotificationClick={onNotificationClick}
-            setPage={handlePageChange}
-            showHamburger={window.innerWidth < 768}
-            onHamburgerClick={toggleSidebar}
-            unreadCount={unreadCount}
-            personalNotificationCount={notificationCount}
-            recentNotifications={recentNotifications} />
+          {/* Single-Row Unified Navbar */}
+          <div className="z-10 shadow-sm w-full">
+            <Navbar
+              role={role}
+              user={user}
+              onNotificationClick={onNotificationClick}
+              setPage={handlePageChange}
+              showHamburger={window.innerWidth < 768}
+              onHamburgerClick={toggleSidebar}
+              unreadCount={unreadCount}
+              personalNotificationCount={notificationCount}
+              recentNotifications={recentNotifications} />
+          </div>
 
-        </div>
-
-        <motion.main
-          ref={mainContentRef}
-          className={`flex-1 min-h-0 min-w-0 p-4 pb-6 md:pb-8 overflow-y-auto overflow-x-hidden thin-scrollbar ${theme === "dark" ? "bg-background" : "bg-gray-50"}`
-          }
-          initial={isNoAnimation ? false : { opacity: 0, y: 20 }}
-          animate={isNoAnimation ? false : { opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}>
+          <motion.main
+            ref={mainContentRef}
+            className={`flex-1 min-h-0 min-w-0 p-4 pb-6 md:pb-8 overflow-y-auto overflow-x-hidden thin-scrollbar ${theme === "dark" ? "bg-background" : "bg-gray-50"}`
+            }
+            initial={isNoAnimation ? false : { opacity: 0, y: 20 }}
+            animate={isNoAnimation ? false : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}>
 
           {/* Page Header */}
 
@@ -299,7 +302,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           }
 
           {isNoAnimation || isMobile ?
-            <div className="w-full">{children}</div> :
+            <div className="w-full flex-1">{children}</div> :
 
             <AnimatePresence mode="popLayout">
               <motion.div
@@ -308,7 +311,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
-                className="w-full">
+                className="w-full flex-1">
 
                 {children}
               </motion.div>
@@ -316,8 +319,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           }
         </motion.main>
       </div>
-    </motion.div>
-  );
+    </div>
+
+    {/* 3. Official Karnataka Government Full-Width Bottom Footer */}
+    <GovFooter />
+  </motion.div>
+);
 };
 
 export default DashboardLayout;

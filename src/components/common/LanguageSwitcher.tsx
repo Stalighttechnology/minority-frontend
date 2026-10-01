@@ -49,15 +49,11 @@ export const LanguageSwitcher: React.FC = () => {
           id="language-switcher-btn"
           variant="ghost"
           size="sm"
-          className={`h-9 px-2.5 sm:px-3 rounded-full flex items-center gap-1.5 transition-colors duration-200 ${
-            theme === 'dark'
-              ? 'hover:bg-accent text-foreground'
-              : 'hover:bg-gray-100 text-gray-700'
-          }`}
+          className="h-7 px-2 sm:px-2.5 rounded-full flex items-center gap-1.5 transition-colors duration-200 text-white/90 hover:text-white hover:bg-white/15 border border-white/20"
           aria-label="Change Language"
         >
-          <Languages className="w-4 h-4 text-primary" />
-          <span className="text-xs font-semibold tracking-wide uppercase">
+          <Languages className="w-3.5 h-3.5 text-amber-300" />
+          <span className="text-xs font-bold tracking-wide uppercase text-white">
             {activeOption.badge}
           </span>
         </Button>
