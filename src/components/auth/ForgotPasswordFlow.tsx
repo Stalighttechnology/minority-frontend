@@ -406,215 +406,179 @@ const ForgotPasswordFlow = ({ setPage }: ForgotPasswordFlowProps) => {
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Section - Form */}
-      <motion.div
-        className="flex-1 bg-white flex items-center justify-center p-8"
-        initial={{ opacity: 0, x: -50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6 }}>
-        
-        <div className="w-full max-w-md">
-          {/* Progress Steps */}
-          <motion.div
-            className="mb-8"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}>
-            
-            <div className="flex items-center justify-between">
-              {steps.map((step, index) => {
-                const isActive = index <= currentStepIndex;
-                const isCurrent = index === currentStepIndex;
-                const Icon = step.icon;
+    <div
+      className="min-h-screen flex flex-col justify-between font-sans bg-cover bg-center relative notranslate"
+      style={{
+        backgroundImage: `linear-gradient(to right, rgba(7, 25, 47, 0.62), rgba(11, 41, 75, 0.40), rgba(8, 28, 54, 0.65)), url('/desktop image.jpg')`,
+      }}
+    >
+      {/* Top Karnataka Flag Ribbon */}
+      <div className="w-full h-1.5 flex shadow-sm z-20">
+        <div className="w-1/2 h-full bg-[#DC2626]" title="Karnataka State Flag - Red" />
+        <div className="w-1/2 h-full bg-[#EAB308]" title="Karnataka State Flag - Yellow" />
+      </div>
 
-                return (
-                  <div key={step.id} className="flex items-center flex-1">
-                    <div className="flex flex-col items-center">
-                      <motion.div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                        isActive ?
-                        isCurrent ?
-                        'bg-primary border-primary text-white' :
-                        'bg-primary/20 border-primary text-primary' :
-                        'bg-gray-100 border-gray-200 text-gray-500'}`
-                        }
-                        animate={{
-                          scale: isCurrent ? 1.1 : 1
-                        }}
-                        transition={{ duration: 0.2 }}>
-                        
-                        <Icon className="w-4 h-4" />
-                      </motion.div>
-                      <div className="mt-2 text-center">
-                        <p className={`text-xs font-medium ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-6 sm:p-10 lg:p-16 gap-8 lg:gap-16 max-w-7xl mx-auto w-full z-10">
+        {/* Left Section: Branding & Emblem */}
+        <motion.div
+          className="flex-1 text-white max-w-xl text-center lg:text-left space-y-6"
+          initial={{ opacity: 0, x: -40 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <div className="flex flex-col sm:flex-row items-center lg:items-start gap-4">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 backdrop-blur-md p-2.5 border border-white/20 shadow-2xl flex items-center justify-center shrink-0">
+              <img
+                src="/kar-logo.png"
+                alt="Government of Karnataka Emblem"
+                className="w-full h-full object-contain drop-shadow-md"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <div className="inline-block text-[11px] font-bold text-amber-300 uppercase tracking-widest bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-300/30">
+                ಕರ್ನಾಟಕ ಸರ್ಕಾರ • Govt. of Karnataka
+              </div>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight text-white drop-shadow">
+                DIRECTORATE OF MINORITIES
+              </h1>
+              <p className="text-sm sm:text-base font-medium text-slate-200">
+                Official Account Recovery & Security Portal
+              </p>
+            </div>
+          </div>
+
+          <p className="text-slate-300 text-sm leading-relaxed hidden sm:block">
+            Secure self-service identity verification and password recovery verified via official 6-digit OTP verification codes.
+          </p>
+        </motion.div>
+
+        {/* Right Section: Form Card */}
+        <motion.div
+          className="w-full max-w-md"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/40 dark:border-slate-800 p-7 sm:p-9 text-slate-900 dark:text-white">
+            {/* Progress Steps */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between">
+                {steps.map((step, index) => {
+                  const isActive = index <= currentStepIndex;
+                  const isCurrent = index === currentStepIndex;
+                  const Icon = step.icon;
+
+                  return (
+                    <div key={step.id} className="flex items-center flex-1">
+                      <div className="flex flex-col items-center">
+                        <motion.div
+                          className={`w-9 h-9 rounded-full flex items-center justify-center border-2 text-xs font-bold transition-all duration-200 ${
+                            isActive
+                              ? isCurrent
+                                ? "bg-[#0F3F73] border-[#0F3F73] text-white shadow"
+                                : "bg-[#0F3F73]/15 border-[#0F3F73] text-[#0F3F73] dark:text-amber-400"
+                              : "bg-slate-100 border-slate-200 text-slate-400"
+                          }`}
+                          animate={{ scale: isCurrent ? 1.08 : 1 }}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </motion.div>
+                        <p className={`text-[10px] font-semibold mt-1 ${isActive ? "text-[#0F3F73] dark:text-white" : "text-slate-400"}`}>
                           {step.title}
                         </p>
-                        <p className={`text-xs ${isActive ? 'text-gray-600' : 'text-gray-600'}`}>
-                          {step.description}
-                        </p>
                       </div>
+                      {index < steps.length - 1 && (
+                        <div
+                          className={`flex-1 h-0.5 mx-2 transition-all duration-300 ${
+                            index < currentStepIndex ? "bg-[#0F3F73]" : "bg-slate-200 dark:bg-slate-700"
+                          }`}
+                        />
+                      )}
                     </div>
-                    {index < steps.length - 1 &&
-                    <div
-                      className={`flex-1 h-0.5 mx-4 transition-all duration-500 ${
-                      index < currentStepIndex ? 'bg-primary' : 'bg-gray-200'}`
-                      } />
-
-                    }
-                  </div>);
-
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </motion.div>
 
-          {/* Title */}
-          <motion.div
-            className="text-center mb-8"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}>
-            
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              {currentStep === 'email' && 'Reset Password'}
-              {currentStep === 'otp' && 'Verify Identity'}
-              {currentStep === 'password' && 'Create New Password'}
-              {currentStep === 'success' && 'All Done!'}
-            </h1>
-            <p className="text-gray-600 text-sm">
-              {currentStep === 'email' && 'Enter your email to receive a reset code'}
-              {currentStep === 'otp' && 'Enter the verification code sent to your email'}
-              {currentStep === 'password' && 'Choose a strong password for your account'}
-              {currentStep === 'success' && 'Your password has been successfully reset'}
-            </p>
-          </motion.div>
+            {/* Title */}
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold text-[#0F3F73] dark:text-white">
+                {currentStep === "email" && "Reset Password"}
+                {currentStep === "otp" && "Verify Identity"}
+                {currentStep === "password" && "Create New Password"}
+                {currentStep === "success" && "Password Reset Successful"}
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {currentStep === "email" && "Enter your registered email address"}
+                {currentStep === "otp" && "Enter the 6-digit verification code"}
+                {currentStep === "password" && "Choose a strong password for your account"}
+                {currentStep === "success" && "Your password has been successfully updated"}
+              </p>
+            </div>
 
-          {/* Form */}
-          <motion.div
-            className="space-y-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}>
-            
-            {error &&
-            <motion.div
-              className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-sm flex items-center gap-2"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}>
-              
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                {error}
+            {/* Error Message */}
+            {error && (
+              <motion.div
+                className="bg-red-50 border border-red-200 text-red-700 p-2.5 rounded-lg text-xs flex items-center gap-2 mb-4"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+              >
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{error}</span>
               </motion.div>
-            }
+            )}
 
+            {/* Dynamic Step Content */}
             <AnimatePresence mode="wait">
               {renderStepContent()}
             </AnimatePresence>
 
-            {currentStep !== 'success' &&
-            <Button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="w-full bg-primary hover:bg-primary/90 text-white font-medium rounded-lg h-12 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]">
-              
-                {loading ?
-              <div className="flex items-center justify-center gap-2">
+            {currentStep !== "success" && (
+              <Button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="w-full bg-[#0F3F73] hover:bg-[#0B335E] text-white font-bold rounded-xl h-11 shadow-lg shadow-[#0F3F73]/25 mt-4 transition-all"
+              >
+                {loading ? (
+                  <div className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     {getButtonText()}
-                  </div> :
-
-              <div className="flex items-center justify-center gap-2">
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
                     {getButtonIcon()}
                     {getButtonText()}
                   </div>
-              }
+                )}
               </Button>
-            }
+            )}
 
-            <div className="text-center">
+            <div className="text-center mt-5">
               <button
                 type="button"
                 onClick={() => setPage("login")}
-                className="text-primary hover:text-primary/80 text-sm transition-colors duration-300 flex items-center justify-center gap-1">
-                
+                className="text-xs font-semibold text-[#0F3F73] hover:text-[#0B335E] dark:text-amber-400 inline-flex items-center gap-1.5 transition-colors"
+              >
                 <ArrowLeft className="h-3 w-3" />
-                Back to Login
+                Back to Sign In
               </button>
             </div>
-          </motion.div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Official Government Bottom Footer */}
+      <footer className="w-full bg-[#0A2647]/90 backdrop-blur-md border-t border-white/10 py-2.5 px-6 text-center text-[11px] text-slate-300 z-20">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>ಕರ್ನಾಟಕ ಸರ್ಕಾರ • ಅಲ್ಪಸಂಖ್ಯಾತರ ಕಲ್ಯಾಣ ಇಲಾಖೆ (Minority Welfare Department)</span>
+          <span>Compliant with Karnataka e-Governance & Digital Security Standards • © {new Date().getFullYear()}</span>
         </div>
-      </motion.div>
-
-      {/* Right Section - Illustration */}
-      <motion.div
-        className="flex-1 bg-gradient-to-br from-[hsl(var(--primary))] to-[#7c3aed] flex items-center justify-center p-8 relative overflow-hidden"
-        initial={{ opacity: 0, x: 50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6, delay: 0.2 }}>
-        
-        {/* Background decorative elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-xl" />
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/10 rounded-full blur-xl" />
-          <div className="absolute top-1/2 left-1/4 w-20 h-20 bg-white/5 rounded-full blur-lg" />
-        </div>
-
-        <div className="relative z-10 text-center text-white max-w-lg">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.6 }}>
-            
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              {isPasswordResetFlow ? 'Complete Your' : 'Secure Password'}
-              <br />
-              <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-                {isPasswordResetFlow ? 'Account Setup' : 'Recovery'}
-              </span>
-            </h2>
-            <p className="text-lg text-white/90 mb-8">
-              {isPasswordResetFlow ?
-              'Set your new password to complete account activation' :
-              'Reset your password securely in just a few steps'
-              }
-            </p>
-          </motion.div>
-
-          {/* Forgot Password SVG Illustration */}
-          <motion.div
-            className="mx-auto w-80 md:w-96 max-w-lg"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1, delay: 1 }}>
-            
-            <motion.img
-              src="/undraw_forgot-password_nttj.svg"
-              alt="Forgot Password Illustration"
-              className="w-full h-auto drop-shadow-2xl filter brightness-110 contrast-110"
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              style={{
-                filter: 'drop-shadow(0 20px 25px rgba(0, 0, 0, 0.15)) brightness(1.1) contrast(1.1)'
-              }} />
-            
-          </motion.div>
-
-          <motion.div
-            className="mt-6 text-white/80 text-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 1.2 }}>
-            
-            STALIGHT CAMPUS Security
-            <br />
-            <span className="text-xs text-white/60 mt-2 block">
-              Secure password recovery system
-            </span>
-          </motion.div>
-        </div>
-      </motion.div>
-    </div>);
+      </footer>
+    </div>
+  );
 
 };
 

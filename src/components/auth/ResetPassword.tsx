@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { resetPassword } from "../../utils/authService";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Shield, LockKeyhole, ArrowLeft, KeyRound } from "lucide-react";
+import { Shield, LockKeyhole, ArrowLeft, KeyRound, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface ResetPasswordProps {
   setPage: (page: string) => void;
@@ -57,7 +57,7 @@ const ResetPassword = ({ setPage }: ResetPasswordProps) => {
       });
 
       if (response.success) {
-        setSuccess("Password reset successfully");
+        setSuccess("Password reset successfully. Redirecting to login...");
         setIsReset(true);
         sessionStorage.removeItem("temp_user_id");
         setTimeout(() => {
@@ -68,216 +68,186 @@ const ResetPassword = ({ setPage }: ResetPasswordProps) => {
       }
     } catch (err) {
       setError("Network error. Please try again.");
-
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Section - Reset Form */}
-      <motion.div
-        className="flex-1 bg-[#1c1c1e] flex items-center justify-center p-8"
-        initial={{ opacity: 0, x: -50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6 }}>
-        
-        <div className="w-full max-w-md">
-          {/* Title */}
-          <motion.div
-            className="text-center mb-8"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}>
-            
-            <h1 className="text-2xl font-bold text-white mb-2">Reset Password</h1>
-            <p className="text-gray-400 text-sm">Enter the OTP and your new password</p>
-          </motion.div>
+    <div className="min-h-screen relative flex flex-col justify-between overflow-x-hidden font-sans">
+      {/* Background Image with Responsive Media Query Fallback */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 md:bg-[url('/desktop%20image.jpg')] bg-[url('/mobile%20image.jpg')]"
+      />
+      
+      {/* Official Government Dark/Navy Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#07192F]/62 via-[#0B294B]/40 to-[#081C36]/65" />
 
-          {/* Form */}
-          <motion.div
-            className="space-y-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}>
+      {/* Karnataka State Dual Accent Top Line */}
+      <div className="relative z-20 h-1.5 w-full flex">
+        <div className="h-full w-1/2 bg-[#D92B2B]" />
+        <div className="h-full w-1/2 bg-[#F1C40F]" />
+      </div>
+
+      {/* Main Container */}
+      <div className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <motion.div
+          className="w-full max-w-lg bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 overflow-hidden"
+          initial={{ opacity: 0, y: 25, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          {/* Card Header with Karnataka Emblem */}
+          <div className="bg-gradient-to-r from-[#0F3F73] via-[#154B86] to-[#0D335D] text-white p-6 text-center relative">
+            <div className="flex justify-center mb-3">
+              <div className="bg-white/95 p-2 rounded-full shadow-md w-16 h-16 flex items-center justify-center border-2 border-[#D4AF37]">
+                <img
+                  src="/kar-logo.png"
+                  alt="Government of Karnataka Emblem"
+                  className="w-12 h-12 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            </div>
             
-            {error &&
-            <motion.div
-              className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}>
-              
-                {error}
+            <p className="text-[#F5D547] text-xs font-semibold tracking-wider uppercase mb-0.5">
+              ಕರ್ನಾಟಕ ಸರ್ಕಾರ | Government of Karnataka
+            </p>
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white uppercase">
+              DIRECTORATE OF MINORITIES
+            </h1>
+            <p className="text-blue-100 text-xs mt-1 font-medium">
+              Create New Secure Credential
+            </p>
+          </div>
+
+          {/* Card Body */}
+          <div className="p-6 sm:p-8 space-y-6">
+            {error && (
+              <motion.div
+                className="bg-red-50 border-l-4 border-red-600 text-red-800 p-3.5 rounded text-sm flex items-start gap-2.5 shadow-sm"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <span className="font-medium leading-tight">{error}</span>
               </motion.div>
-            }
-            
-            {success &&
-            <motion.div
-              className="bg-green-500/10 border border-green-500/20 text-green-400 p-3 rounded-lg text-sm"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}>
-              
-                {success}
+            )}
+
+            {success && (
+              <motion.div
+                className="bg-emerald-50 border-l-4 border-emerald-600 text-emerald-800 p-3.5 rounded text-sm flex items-start gap-2.5 shadow-sm"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <span className="font-medium leading-tight">{success}</span>
               </motion.div>
-            }
-            
+            )}
+
             <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="otp" className="text-sm font-medium text-gray-300">
-                  Verification Code
+              <div className="space-y-1.5">
+                <label htmlFor="otp" className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Security OTP Code *
                 </label>
                 <div className="relative">
-                  <Shield className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+                  <Shield className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
                   <Input
                     id="otp"
                     type="text"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
-                    placeholder="Enter 6-digit OTP"
-                    className="pl-10 bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-primary focus:ring-[hsl(var(--primary))]/20 rounded-lg h-12 text-center transition-all duration-300"
-                    maxLength={6} />
-                  
+                    placeholder="Enter 6-digit OTP code"
+                    className="pl-10 h-11 bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-lg text-center tracking-widest text-base font-semibold focus:border-[#0F3F73] focus:ring-1 focus:ring-[#0F3F73]"
+                    maxLength={6}
+                  />
                 </div>
               </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="newPassword" className="text-sm font-medium text-gray-300">
-                  New Password
+
+              <div className="space-y-1.5">
+                <label htmlFor="newPassword" className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  New Password *
                 </label>
                 <div className="relative">
-                  <LockKeyhole className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+                  <LockKeyhole className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
                   <Input
                     id="newPassword"
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    className="pl-10 bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-primary focus:ring-[hsl(var(--primary))]/20 rounded-lg h-12 transition-all duration-300" />
-                  
+                    placeholder="Enter strong password"
+                    className="pl-10 h-11 bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-lg text-sm focus:border-[#0F3F73] focus:ring-1 focus:ring-[#0F3F73]"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-300">
-                  Confirm Password
+              <div className="space-y-1.5">
+                <label htmlFor="confirmPassword" className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Confirm New Password *
                 </label>
                 <div className="relative">
-                  <KeyRound className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+                  <KeyRound className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
                   <Input
                     id="confirmPassword"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm new password"
-                    className="pl-10 bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-primary focus:ring-[hsl(var(--primary))]/20 rounded-lg h-12 transition-all duration-300" />
-                  
+                    placeholder="Re-enter password"
+                    className="pl-10 h-11 bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-lg text-sm focus:border-[#0F3F73] focus:ring-1 focus:ring-[#0F3F73]"
+                  />
                 </div>
               </div>
             </div>
 
             <Button
               onClick={handleResetPassword}
-              disabled={loading}
-              className="w-full bg-primary hover:bg-primary/90 text-white font-medium rounded-lg h-12 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]">
-              
-              {loading ?
-              <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Resetting...
-                </div> :
-
-              "Reset Password"
-              }
+              disabled={loading || isReset}
+              className="w-full bg-[#0F3F73] hover:bg-[#0c3159] text-white font-semibold rounded-lg h-11 shadow-md hover:shadow-lg transition-all text-sm tracking-wide uppercase"
+            >
+              {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Updating Password...
+                </div>
+              ) : (
+                "Save & Reset Password"
+              )}
             </Button>
 
-            <div className="text-center">
+            <div className="text-center pt-2">
               <button
                 type="button"
                 onClick={() => setPage("login")}
-                className="text-primary hover:text-primary/80 text-sm transition-colors duration-300 flex items-center justify-center gap-1">
-                
-                <ArrowLeft className="h-3 w-3" />
-                Back to Login
+                className="text-sm font-semibold text-[#0F3F73] hover:text-[#0b2d52] inline-flex items-center gap-1.5 hover:underline"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Official Login
               </button>
             </div>
-          </motion.div>
+          </div>
+
+          {/* Card Footer */}
+          <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 text-center text-xs text-slate-600">
+            Protected under Government of Karnataka Information Security Policy
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Official Portal Footer */}
+      <footer className="relative z-10 bg-slate-950/80 backdrop-blur-md text-slate-300 text-xs py-3 px-4 border-t border-white/10 text-center flex flex-col sm:flex-row items-center justify-between gap-2 max-w-7xl mx-auto w-full">
+        <div>
+          © {new Date().getFullYear()} Directorate of Minorities, Government of Karnataka. All Rights Reserved.
         </div>
-      </motion.div>
-
-      {/* Right Section - Welcome & Illustration */}
-      <motion.div
-        className="flex-1 bg-gradient-to-br from-[hsl(var(--primary))] to-[#7c3aed] flex items-center justify-center p-8 relative overflow-hidden"
-        initial={{ opacity: 0, x: 50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6, delay: 0.2 }}>
-        
-        {/* Background decorative elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-xl" />
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/10 rounded-full blur-xl" />
-          <div className="absolute top-1/2 left-1/4 w-20 h-20 bg-white/5 rounded-full blur-lg" />
+        <div className="flex items-center gap-4 text-[11px] text-slate-400">
+          <span>Designed & Hosted by e-Governance Department</span>
+          <span className="hidden sm:inline">•</span>
+          <span>Version 3.2.0</span>
         </div>
-
-        <div className="relative z-10 text-center text-white max-w-md">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.6 }}>
-            
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Secure Your
-              <br />
-              <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-                Account
-              </span>
-            </h2>
-            <p className="text-lg text-white/90 mb-8">
-              Create a strong new password for your account
-            </p>
-          </motion.div>
-
-          {/* Animated security illustration */}
-          <motion.div
-            className="flex justify-center mb-8"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.8 }}>
-            
-            <motion.div
-              className="p-6 bg-white/10 rounded-full backdrop-blur-sm"
-              animate={{
-                scale: [1, 1.1, 1],
-                rotate: [0, 5, -5, 0]
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}>
-              
-              <Shield className="w-12 h-12 text-white" />
-            </motion.div>
-          </motion.div>
-
-          <motion.div
-            className="text-white/80 text-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 1.2 }}>
-            
-            STALIGHT CAMPUS Security
-            <br />
-            <span className="text-xs text-white/60 mt-2 block">
-              Your data is protected with enterprise-grade security
-            </span>
-          </motion.div>
-        </div>
-      </motion.div>
-    </div>);
-
+      </footer>
+    </div>
+  );
 };
 
 export default ResetPassword;

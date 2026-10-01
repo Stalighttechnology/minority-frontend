@@ -159,11 +159,24 @@ const Index = () => {
     };
 
     return (
-      <div className={isMobile ? "relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-gradient-to-b from-violet-600 via-violet-800 to-violet-950" : "w-full"}>
+      <div
+        className={
+          isMobile
+            ? "relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-cover bg-center bg-no-repeat"
+            : "w-full min-h-screen"
+        }
+        style={
+          isMobile
+            ? {
+                backgroundImage: `linear-gradient(to bottom, rgba(10, 38, 71, 0.62), rgba(15, 63, 115, 0.40), rgba(10, 30, 56, 0.68)), url('/mobile image.jpg')`,
+              }
+            : undefined
+        }
+      >
         {isMobile && (
           <>
-            <div className="absolute w-[360px] h-[360px] bg-violet-500/30 blur-[72px] rounded-full top-[-100px] left-[-80px] z-0 pointer-events-none" />
-            <div className="absolute w-[360px] h-[360px] bg-violet-400/30 blur-[72px] rounded-full bottom-[-80px] right-[-80px] z-0 pointer-events-none" />
+            <div className="absolute w-[360px] h-[360px] bg-amber-500/10 blur-[80px] rounded-full top-[-100px] left-[-80px] z-0 pointer-events-none" />
+            <div className="absolute w-[360px] h-[360px] bg-blue-500/20 blur-[80px] rounded-full bottom-[-80px] right-[-80px] z-0 pointer-events-none" />
           </>
         )}
         <AnimatePresence mode="popLayout">

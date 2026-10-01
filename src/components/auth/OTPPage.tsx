@@ -135,7 +135,6 @@ const OTPPage = ({ setRole, setPage, setUser }: OTPPageProps) => {
       }
     } catch (err) {
       setError("Network error. Please try again.");
-
     } finally {
       setLoading(false);
     }
@@ -167,196 +166,170 @@ const OTPPage = ({ setRole, setPage, setUser }: OTPPageProps) => {
       setError("Network error. Please try again.");
       setResendDisabled(false);
       setCountdown(0);
-
     }
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Section - OTP Verification Form */}
-      <motion.div
-        className="flex-1 bg-[#1c1c1e] flex items-center justify-center p-8"
-        initial={{ opacity: 0, x: -50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6 }}>
-        
-        <div className="w-full max-w-md">
-          {/* Title */}
-          <motion.div
-            className="text-center mb-8"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}>
-            
-            <h1 className="text-2xl font-bold text-white mb-2">Verify Your Identity</h1>
-            <p className="text-gray-400 text-sm">Enter the verification code sent to your email</p>
-          </motion.div>
+    <div
+      className="min-h-screen flex flex-col justify-between font-sans bg-cover bg-center relative notranslate"
+      style={{
+        backgroundImage: `linear-gradient(to right, rgba(7, 25, 47, 0.62), rgba(11, 41, 75, 0.40), rgba(8, 28, 54, 0.65)), url('/desktop image.jpg')`,
+      }}
+    >
+      {/* Top Karnataka Flag Ribbon */}
+      <div className="w-full h-1.5 flex shadow-sm z-20">
+        <div className="w-1/2 h-full bg-[#DC2626]" title="Karnataka State Flag - Red" />
+        <div className="w-1/2 h-full bg-[#EAB308]" title="Karnataka State Flag - Yellow" />
+      </div>
 
-          {/* Form */}
-          <motion.div
-            className="space-y-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}>
-            
-            {error &&
-            <motion.div
-              className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}>
-              
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-6 sm:p-10 lg:p-16 gap-8 lg:gap-16 max-w-7xl mx-auto w-full z-10">
+        {/* Left Section: Branding & Emblem */}
+        <motion.div
+          className="flex-1 text-white max-w-xl text-center lg:text-left space-y-6"
+          initial={{ opacity: 0, x: -40 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <div className="flex flex-col sm:flex-row items-center lg:items-start gap-4">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 backdrop-blur-md p-2.5 border border-white/20 shadow-2xl flex items-center justify-center shrink-0">
+              <img
+                src="/kar-logo.png"
+                alt="Government of Karnataka Emblem"
+                className="w-full h-full object-contain drop-shadow-md"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <div className="inline-block text-[11px] font-bold text-amber-300 uppercase tracking-widest bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-300/30">
+                ಕರ್ನಾಟಕ ಸರ್ಕಾರ • Govt. of Karnataka
+              </div>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight text-white drop-shadow">
+                DIRECTORATE OF MINORITIES
+              </h1>
+              <p className="text-sm sm:text-base font-medium text-slate-200">
+                Two-Factor Security Verification
+              </p>
+            </div>
+          </div>
+
+          <p className="text-slate-300 text-sm leading-relaxed hidden sm:block">
+            Two-factor authentication step ensuring verified government personnel access.
+          </p>
+        </motion.div>
+
+        {/* Right Section: Form Card */}
+        <motion.div
+          className="w-full max-w-md"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/40 dark:border-slate-800 p-7 sm:p-9 text-slate-900 dark:text-white">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[#0F3F73]/10 dark:bg-primary/20 text-[#0F3F73] dark:text-primary mb-2">
+                <Shield className="w-5 h-5" />
+              </div>
+              <h2 className="text-xl font-bold text-[#0F3F73] dark:text-white">Verify Your Identity</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Enter the 6-digit verification code sent to your registered email
+              </p>
+            </div>
+
+            {error && (
+              <motion.div
+                className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-xs mb-4"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+              >
                 {error}
               </motion.div>
-            }
-            
-            {success &&
-            <motion.div
-              className="bg-green-500/10 border border-green-500/20 text-green-400 p-3 rounded-lg text-sm"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}>
-              
+            )}
+
+            {success && (
+              <motion.div
+                className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 rounded-lg text-xs mb-4"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+              >
                 {success}
               </motion.div>
-            }
-            
+            )}
+
             <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="otp" className="text-sm font-medium text-gray-300">
-                  Verification Code
+              <div className="space-y-1.5">
+                <label htmlFor="otp" className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  6-Digit Verification Code
                 </label>
                 <div className="relative">
-                  <Shield className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+                  <Shield className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
                   <Input
                     id="otp"
                     type="text"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder="Enter 6-digit code"
-                    className="pl-10 bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-primary focus:ring-[hsl(var(--primary))]/20 rounded-lg h-12 text-center text-lg tracking-widest transition-all duration-300"
-                    onKeyPress={(e) => e.key === 'Enter' && handleVerifyOTP()}
-                    maxLength={6} />
-                  
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="Enter code"
+                    className="pl-10 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#0F3F73] focus:ring-[#0F3F73]/20 rounded-xl h-11 text-center text-lg tracking-widest font-bold transition-all"
+                    onKeyPress={(e) => e.key === "Enter" && handleVerifyOTP()}
+                    maxLength={6}
+                  />
                 </div>
               </div>
+
+              <Button
+                onClick={handleVerifyOTP}
+                disabled={loading}
+                className="w-full bg-[#0F3F73] hover:bg-[#0B335E] text-white font-bold rounded-xl h-11 shadow-lg shadow-[#0F3F73]/25 transition-all mt-2"
+              >
+                {loading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Verifying Code...
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    Verify & Proceed
+                  </div>
+                )}
+              </Button>
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setPage("login")}
+                  className="flex-1 px-3 py-2 text-slate-600 dark:text-slate-300 hover:text-[#0F3F73] text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  Back to Sign In
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResendOTP}
+                  disabled={resendDisabled}
+                  className="flex-1 px-3 py-2 text-[#0F3F73] dark:text-amber-400 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  {resendDisabled ? `Resend (${countdown}s)` : "Resend OTP"}
+                </button>
+              </div>
             </div>
+          </div>
+        </motion.div>
+      </div>
 
-            <Button
-              onClick={handleVerifyOTP}
-              disabled={loading}
-              className="w-full bg-primary hover:bg-primary/90 text-white font-medium rounded-lg h-12 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]">
-              
-              {loading ?
-              <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Verifying...
-                </div> :
-
-              <div className="flex items-center justify-center gap-2">
-                  <CheckCircle className="h-4 w-4" />
-                  Verify Code
-                </div>
-              }
-            </Button>
-
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setPage("login")}
-                className="flex-1 px-4 py-2 text-gray-400 hover:text-white text-sm transition-colors duration-300 flex items-center justify-center gap-1 rounded-lg hover:bg-gray-800/30">
-                
-                <ArrowLeft className="h-3 w-3" />
-                Back to Login
-              </button>
-
-              <button
-                type="button"
-                onClick={handleResendOTP}
-                disabled={resendDisabled}
-                className="flex-1 px-4 py-2 text-primary hover:text-primary/80 text-sm transition-colors duration-300 flex items-center justify-center gap-1 rounded-lg hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
-                
-                <RotateCcw className="h-3 w-3" />
-                {resendDisabled ?
-                `Resend (${countdown}s)` :
-                "Resend Code"
-                }
-              </button>
-            </div>
-          </motion.div>
+      {/* Official Government Bottom Footer */}
+      <footer className="w-full bg-[#0A2647]/90 backdrop-blur-md border-t border-white/10 py-2.5 px-6 text-center text-[11px] text-slate-300 z-20">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>ಕರ್ನಾಟಕ ಸರ್ಕಾರ • ಅಲ್ಪಸಂಖ್ಯಾತರ ಕಲ್ಯಾಣ ಇಲಾಖೆ (Minority Welfare Department)</span>
+          <span>Compliant with Karnataka e-Governance & Digital Security Standards • © {new Date().getFullYear()}</span>
         </div>
-      </motion.div>
-
-      {/* Right Section - Welcome & Illustration */}
-      <motion.div
-        className="flex-1 bg-gradient-to-br from-[hsl(var(--primary))] to-[#7c3aed] flex items-center justify-center p-8 relative overflow-hidden"
-        initial={{ opacity: 0, x: 50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6, delay: 0.2 }}>
-        
-        {/* Background decorative elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-xl" />
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/10 rounded-full blur-xl" />
-          <div className="absolute top-1/2 left-1/4 w-20 h-20 bg-white/5 rounded-full blur-lg" />
-        </div>
-
-        <div className="relative z-10 text-center text-white max-w-md">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.6 }}>
-            
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Secure
-              <br />
-              <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-                Verification
-              </span>
-            </h2>
-            <p className="text-lg text-white/90 mb-8">
-              Protect your account with two-factor authentication
-            </p>
-          </motion.div>
-
-          {/* Animated security illustration */}
-          <motion.div
-            className="flex justify-center mb-8"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.8 }}>
-            
-            <motion.div
-              className="p-6 bg-white/10 rounded-full backdrop-blur-sm"
-              animate={{
-                scale: [1, 1.1, 1],
-                rotate: [0, 360]
-              }}
-              transition={{
-                scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                rotate: { duration: 20, repeat: Infinity, ease: "linear" }
-              }}>
-              
-              <Shield className="w-12 h-12 text-white" />
-            </motion.div>
-          </motion.div>
-
-          <motion.div
-            className="text-white/80 text-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 1.2 }}>
-            
-            STALIGHT CAMPUS Security
-            <br />
-            <span className="text-xs text-white/60 mt-2 block">
-              Enhanced security for your academic portal
-            </span>
-          </motion.div>
-        </div>
-      </motion.div>
-    </div>);
-
+      </footer>
+    </div>
+  );
 };
 
 export default OTPPage;
