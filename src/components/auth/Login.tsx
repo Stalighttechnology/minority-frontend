@@ -118,11 +118,10 @@ const Login = ({ setRole, setPage, setUser }: LoginProps) => {
             {/* Error Message */}
             {error && (
               <motion.div
-                className={`p-3 rounded-lg text-xs sm:text-sm border mb-5 ${
-                  error.includes("Password reset required")
+                className={`p-3 rounded-lg text-xs sm:text-sm border mb-5 ${error.includes("Password reset required")
                     ? "bg-blue-50 border-blue-200 text-blue-800"
                     : "bg-red-50 border-red-200 text-red-700"
-                }`}
+                  }`}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3 }}
