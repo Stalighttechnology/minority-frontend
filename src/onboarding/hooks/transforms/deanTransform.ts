@@ -15,7 +15,7 @@ export function deanTransform(step: any, isMobile: boolean): any[] | null {
         target: '#enroll-user-header',
         title: 'Enroll Staff',
         content:
-          'Fill out this form to enroll new HODs, faculty members, Deans, COE, or Fees Managers.',
+          'Fill out this form to enroll new HODs, faculty members, Deans, or Fees Managers.',
         placement: isMobile ? step.placement : 'bottom',
       },
     ];

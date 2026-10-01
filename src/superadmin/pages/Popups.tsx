@@ -224,7 +224,6 @@ const Popups = () => {
                     { id: "teacher", label: "Teacher" },
                     { id: "hod", label: "HOD" },
                     { id: "dean", label: "Dean" },
-                    { id: "coe", label: "COE" },
                     { id: "principal", label: "Principal" },
                     { id: "fees_manager", label: "Fees Manager" },
                     { id: "warden", label: "Warden" },

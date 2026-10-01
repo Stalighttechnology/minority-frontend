@@ -94,7 +94,7 @@ export const deanTour: Step[] = [
     target: '#sidebar-enroll-user',
     title: 'Enroll Staff',
     content:
-      'Onboard and enroll new institutional roles such as HODs, faculty members, Deans, COE, or Fees Managers.',
+      'Onboard and enroll new institutional roles such as HODs, faculty members, Deans, or Fees Managers.',
     placement: 'right' as const,
     disableBeacon: false,
     route: '/dean/enroll-user',

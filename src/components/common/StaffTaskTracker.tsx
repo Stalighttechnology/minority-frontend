@@ -999,7 +999,6 @@ const StaffTaskTracker = () => {
                         <SelectItem value="faculty">Faculty Member / Teacher</SelectItem>
                         <SelectItem value="principal">Principal</SelectItem>
                         <SelectItem value="dean">Dean</SelectItem>
-                        <SelectItem value="coe">Controller of Examinations (COE)</SelectItem>
                         <SelectItem value="fees_manager">Fees Manager</SelectItem>
                         <SelectItem value="admission_manager">Admission Manager</SelectItem>
                         <SelectItem value="hms">Hostel Manager (HMS)</SelectItem>

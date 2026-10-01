@@ -38,7 +38,7 @@ export function orgAdminTransform(step: any, isMobile: boolean): any[] | null {
         ...step,
         target: '#enroll-user-header',
         title: 'Enroll Staff',
-        content: 'Onboard HODs, faculty members, Deans, COE, or Fees Managers from this enrollment console.',
+        content: 'Onboard HODs, faculty members, Deans, or Fees Managers from this enrollment console.',
         placement: isMobile ? step.placement : 'top',
       },
     ];

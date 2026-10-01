@@ -206,7 +206,6 @@ const EnrollUser = ({ setError, toast }: EnrollUserProps) => {
                     <SelectItem value="field_visitor">Field Visitor / Inspection Officer</SelectItem>
                     {userTier >= 2 && (
                       <>
-                        <SelectItem value="coe">COE</SelectItem>
                         <SelectItem value="fees_manager">Fees Manager</SelectItem>
                       </>
                     )}

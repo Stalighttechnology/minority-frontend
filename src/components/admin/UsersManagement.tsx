@@ -110,7 +110,6 @@ const ALL_ROLES = [
   "Teacher",
   "Group D",
   "Security",
-  "COE",
   "Fees Manager",
   "Principal",
   "Org Admin",
@@ -148,7 +147,6 @@ const PRO_PLAN_ROLES = [
   "Security",
   "Student",
   "Dean",
-  "COE",
   "Fees Manager",
   "Admission Counsellor",
   "Driver"
@@ -160,7 +158,6 @@ const roleMap: Record<string, string> = {
   "Teacher": "teacher",
   "Group D": "group_d",
   "Security": "security",
-  "COE": "coe",
   "Fees Manager": "fees_manager",
   "Principal": "principal",
   "Org Admin": "org_admin",

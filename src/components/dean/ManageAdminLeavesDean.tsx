@@ -482,7 +482,6 @@ const ManageAdminLeavesDean = () => {
                     <SelectItem value="group_d">Group D</SelectItem>
                     <SelectItem value="security">Security</SelectItem>
                     <SelectItem value="principal">Principal</SelectItem>
-                    <SelectItem value="coe">COE</SelectItem>
                     <SelectItem value="fees_manager">Fees Manager</SelectItem>
                     <SelectItem value="hod">Head of Department (HOD)</SelectItem>
                     <SelectItem value="hms_admin">HMS Admin</SelectItem>

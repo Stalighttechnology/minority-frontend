@@ -2310,7 +2310,6 @@ const LeaveRequests = React.forwardRef<HTMLDivElement, any>((props, ref) => {
                             <SelectItem value="hod">Head of Department (HOD)</SelectItem>
                             <SelectItem value="dean">Dean</SelectItem>
                             <SelectItem value="principal">Principal</SelectItem>
-                            <SelectItem value="coe">Controller of Examinations (COE)</SelectItem>
                             <SelectItem value="fees_manager">Fees & Accounts Manager</SelectItem>
                             <SelectItem value="admission_manager">Admission Manager</SelectItem>
                             <SelectItem value="hms_admin">Hostel Manager (HMS)</SelectItem>
@@ -3538,7 +3537,6 @@ const LeaveRequests = React.forwardRef<HTMLDivElement, any>((props, ref) => {
                                         <SelectItem value="hod">Head of Department (HOD)</SelectItem>
                                         <SelectItem value="dean">Dean</SelectItem>
                                         <SelectItem value="principal">Principal</SelectItem>
-                                        <SelectItem value="coe">Controller of Examinations (COE)</SelectItem>
                                         <SelectItem value="fees_manager">Fees & Accounts Manager</SelectItem>
                                         <SelectItem value="admission_manager">Admission Manager</SelectItem>
                                         <SelectItem value="hms_admin">Hostel Manager (HMS)</SelectItem>

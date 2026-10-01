@@ -28,7 +28,6 @@ const AVAILABLE_ROLES = [
   { id: 'principal', label: 'Principal' },
   { id: 'dean', label: 'Dean' },
   { id: 'hod', label: 'HOD' },
-  { id: 'coe', label: 'COE' },
   { id: 'admission_manager', label: 'Admission Manager' },
   { id: 'teacher', label: 'Faculty / Teacher' },
   { id: 'library_admin', label: 'Library Admin' },
@@ -241,7 +240,7 @@ export default function ScheduleMeeting() {
       case "coe":
         return ["teacher", "hod", "principal", "dean"];
       case "fees_manager":
-        return ["hod", "principal", "dean", "coe", "org_admin", "admin", "admission_manager"];
+        return ["hod", "principal", "dean", "org_admin", "admin", "admission_manager"];
       case "hms":
       case "hms_admin":
       case "warden":

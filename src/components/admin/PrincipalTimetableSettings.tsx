@@ -1345,7 +1345,6 @@ export default function PrincipalTimetableSettings() {
       { value: 'hod', label: translateTerminology('HOD') || 'HOD' },
       { value: 'dean', label: 'Dean' },
       { value: 'principal', label: 'Principal' },
-      { value: 'coe', label: 'COE' },
       { value: 'admission_manager', label: 'Admission Mgr' },
       { value: 'fees_manager', label: 'Fees Mgr' },
       { value: 'placement_officer', label: 'Placement' },
@@ -3032,7 +3031,6 @@ export default function PrincipalTimetableSettings() {
                           { roleKey: 'hod', label: 'Head of Department (HOD) Leaves', defaultStages: ['dean', 'principal'] },
                           { roleKey: 'principal', label: 'Principal Leaves', defaultStages: ['dean'] },
                           { roleKey: 'dean', label: 'Dean Leaves', defaultStages: ['principal'] },
-                          { roleKey: 'coe', label: 'COE Leaves', defaultStages: ['principal'] },
                           { roleKey: 'fees_manager', label: 'Fees Manager Leaves', defaultStages: ['principal'] },
                           { roleKey: 'counsellor', label: 'Counsellor Leaves', defaultStages: ['admission_manager', 'principal'] },
                           { roleKey: 'hms_admin', label: 'HMS Admin Leaves', defaultStages: ['principal'] },
@@ -3051,7 +3049,6 @@ export default function PrincipalTimetableSettings() {
                             { value: 'admission_manager', label: 'Admission Manager' },
                             { value: 'hms_admin', label: 'HMS Admin' },
                             { value: 'transport_admin', label: 'Transport Admin' },
-                            { value: 'coe', label: 'COE' },
                             { value: 'fees_manager', label: 'Fees Manager' }
                           ];
 
