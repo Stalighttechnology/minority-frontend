@@ -261,7 +261,7 @@ const Onboarding = () => {
             onClick={() => navigate("/")}
             className="w-full bg-primary hover:bg-primary/90 h-14 rounded-2xl text-white font-semibold text-lg shadow-xl shadow-primary/30 transition-all hover:translate-y-[-2px]"
           >
-            Enter Campus
+            Enter School
             <ArrowRight className="ml-2" size={20} />
           </Button>
         </motion.div>

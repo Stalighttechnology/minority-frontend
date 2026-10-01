@@ -60,7 +60,7 @@ const Login = ({ setRole, setPage, setUser }: LoginProps) => {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.8 }}
           >
-            Login to access your Campus portal
+            Login to access your School portal
           </motion.p>
 
           {/* Educator SVG Illustration */}

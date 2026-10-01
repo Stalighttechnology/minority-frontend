@@ -56,7 +56,7 @@ const LoginMobile = ({ setRole, setPage, setUser }: LoginMobileProps) => {
       <div className="text-center space-y-1 pt-7 pb-4 [@media(max-height:720px)]:pt-4 [@media(max-height:720px)]:pb-2 shrink-0 px-4">
         <p className="text-white text-sm font-medium opacity-90 [@media(max-height:720px)]:text-xs">Welcome to</p>
         <h1 className="text-white text-xl font-extrabold [@media(max-height:720px)]:text-lg">STALIGHT CAMPUS</h1>
-        <p className="text-white text-xs opacity-80 [@media(max-height:720px)]:text-[10px]">Login to access your Campus portal</p>
+        <p className="text-white text-xs opacity-80 [@media(max-height:720px)]:text-[10px]">Login to access your School portal</p>
       </div>
 
       {/* MAIN CONTENT */}

@@ -582,8 +582,8 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
       { name: "Staff Tasks", page: "staff-tasks" },
       { name: "School-Issued Items", page: "issued-items" },
       { name: "Sports & Wellness", page: "sports-wellness" },
-      { name: "Campus Locations", page: "campus-locations" },
-      { name: "Campus Monitoring", page: "campus-monitoring" },
+      { name: "School Locations", page: "campus-locations" },
+      { name: "School Monitoring", page: "campus-monitoring" },
       { name: "Scan for Student Info", page: "scan-student-info" },
       { name: "Alumni Directory", page: "alumni-directory" },
       { name: "Calendar", page: "holiday-calendar" },
@@ -609,8 +609,8 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
       { name: "School Profile & Report Card", page: "college-details" },
       { name: "Announcement Management", page: "announcement-management" },
       { name: "Schedule Meeting", page: "schedule-meeting" },
-      { name: "Campus Locations", page: "campus-locations" },
-      { name: "Campus Monitoring", page: "campus-monitoring" },
+      { name: "School Locations", page: "campus-locations" },
+      { name: "School Monitoring", page: "campus-monitoring" },
       { name: "Billing & Plans", page: "billing" },
       { name: "Scan for Student Info", page: "scan-student-info" },
       { name: "Alumni Directory", page: "alumni-directory" },
@@ -707,7 +707,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
       { name: "Schedule Meeting", page: "schedule-meeting" },
       { name: "Staff Tasks", page: "staff-tasks" },
       //{ name: "College-Issued Items", page: "issued-items" },
-      { name: "Campus Assets & Support", page: "inventory" },
+      { name: "School Assets & Support", page: "inventory" },
       { name: "Calendar", page: "holiday-calendar" },
       { name: "Reimbursements & Claims", page: "reimbursements" },
       { name: "My Salary & Payroll", page: "my-payroll" },
@@ -781,7 +781,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
       { name: "Enroll Staff", page: "enroll-user" },
       { name: "Announcement Management", page: "announcement-management" },
       { name: "Finance", page: "finance" },
-      { name: "Campus Locations", page: "campus-locations" },
+      { name: "School Locations", page: "campus-locations" },
       { name: "Billing & Plans", page: "billing" },
       { name: "Scan for Student Info", page: "scan-student-info" },
       { name: "Alumni Directory", page: "alumni-directory" },
@@ -893,7 +893,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
       { name: "Counsellors", page: "counsellor-management" },
       { name: "Communication", page: "admission-communication" },
       { name: "Reports", page: "admission-reports" },
-      { name: "Campus Page Management", page: "campus-builder" },
+      { name: "School Page Management", page: "campus-builder" },
       { name: "Schedule Meeting", page: "schedule-meeting" },
       { name: "Staff Tasks", page: "staff-tasks" },
       { name: "Apply Leave", page: "apply-leave" },
@@ -1111,7 +1111,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
                 transition={{ duration: 0.2 }}
                 className="flex flex-col min-w-0"
               >
-                <h3 className={`font-semibold text-lg whitespace-nowrap leading-tight ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Campus ERP</h3>
+                <h3 className={`font-semibold text-lg whitespace-nowrap leading-tight ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>School ERP</h3>
                 <p className={`text-[10px]  tracking-wider font-medium ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>By Stalight Technologies</p>
               </motion.div>
             )}

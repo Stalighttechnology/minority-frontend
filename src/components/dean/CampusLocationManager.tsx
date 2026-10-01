@@ -335,9 +335,9 @@ const CampusLocationManager: React.FC = () => {
       <Card id="dean-campus-locations-header" className={`shrink-0 ${theme === 'dark' ? 'bg-card border border-border' : 'bg-white border border-gray-200'}`}>
         <CardHeader className="border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <CardTitle className={`text-xl sm:text-2xl font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Campus Location Management</CardTitle>
+            <CardTitle className={`text-xl sm:text-2xl font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>School Location Management</CardTitle>
             <CardDescription className="text-sm sm:text-sm text-muted-foreground mt-1">
-              Set and manage campus boundaries for geolocation-based attendance
+              Set and manage school boundaries for geolocation-based attendance
             </CardDescription>
           </div>
           <div className="w-full sm:w-auto">
@@ -353,7 +353,7 @@ const CampusLocationManager: React.FC = () => {
         <Dialog open={showForm} onOpenChange={setShowForm}>
           <DialogContent className={theme === 'dark' ? 'bg-card border border-border text-foreground w-[95%] max-w-[400px] sm:max-w-[720px] max-h-[90dvh] flex flex-col overflow-hidden rounded-lg mx-auto' : 'bg-white border border-gray-200 text-gray-900 w-[95%] max-w-[400px] sm:max-w-[720px] max-h-[90dvh] flex flex-col overflow-hidden rounded-lg mx-auto'}>
             <DialogHeader className="shrink-0">
-              <DialogTitle className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>{editingLocation ? 'Edit' : 'Add'} Campus Location</DialogTitle>
+              <DialogTitle className={theme === 'dark' ? 'text-foreground' : 'text-gray-900'}>{editingLocation ? 'Edit' : 'Add'} School Location</DialogTitle>
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto min-h-0 w-full min-w-0 p-4 sm:p-4 overscroll-contain thin-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -371,7 +371,7 @@ const CampusLocationManager: React.FC = () => {
                       onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                       rows={2}
                       className="resize-none overflow-auto max-h-[140px]"
-                      aria-label="Campus location description" />
+                      aria-label="School location description" />
                     
                   </div>
                 </div>
@@ -417,7 +417,7 @@ const CampusLocationManager: React.FC = () => {
                 </div>
 
                 <div className="w-full h-[180px] sm:h-[260px] md:h-[360px] border rounded-lg overflow-hidden relative min-w-0">
-                  <iframe src={iframeUrl} className="absolute inset-0 w-full h-full" style={{ border: 0, objectFit: 'cover' }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="Campus Location Map" />
+                  <iframe src={iframeUrl} className="absolute inset-0 w-full h-full" style={{ border: 0, objectFit: 'cover' }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="School Location Map" />
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 w-full mt-4">
@@ -438,7 +438,7 @@ const CampusLocationManager: React.FC = () => {
 
         <Card className={theme === 'dark' ? 'bg-card border border-border' : 'bg-white border border-gray-200'}>
           <CardHeader>
-            <CardTitle className={`text-xl sm:text-2xl font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>Campus Locations</CardTitle>
+            <CardTitle className={`text-xl sm:text-2xl font-semibold ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>School Locations</CardTitle>
           </CardHeader>
           <CardContent className="h-[50vh] sm:h-auto">{/* mobile: constrained height; desktop/tablet keep auto */}
             <div className="flex flex-col h-full w-full min-h-0">
@@ -453,10 +453,10 @@ const CampusLocationManager: React.FC = () => {
                       <MapPin className="w-10 h-10 text-primary opacity-50" />
                     </div>
                     <h3 className={`text-lg font-semibold mb-1 ${theme === 'dark' ? 'text-foreground' : 'text-gray-900'}`}>
-                      No Campus Locations Found
+                      No School Locations Found
                     </h3>
                     <p className={`text-center max-w-sm text-sm ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
-                      You haven't configured any campus boundaries yet. Click the "Add Location" button above to set up geolocation rules for attendance.
+                      You haven't configured any school boundaries yet. Click the "Add Location" button above to set up geolocation rules for attendance.
                     </p>
                   </div> :
 
