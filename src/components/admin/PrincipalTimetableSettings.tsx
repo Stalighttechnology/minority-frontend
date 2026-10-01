@@ -127,7 +127,7 @@ const DEFAULT_CATEGORY_WORKFLOWS: Record<string, any> = {
 const DEFAULT_STAFF_CATEGORY_MAPPING: Record<string, string[]> = {
   teaching: ['teacher', 'hod', 'dean'],
   non_teaching: ['caretaker', 'driver', 'warden', 'library_admin', 'transport_admin', 'hms_admin', 'group_d', 'security', 'inventory_manager'],
-  admin_branch: ['principal', 'org_admin', 'admission_manager', 'fees_manager', 'coe', 'placement_officer', 'counsellor'],
+  admin_branch: ['principal', 'org_admin', 'admission_manager', 'fees_manager', 'placement_officer', 'counsellor'],
 };
 
 function ShadcnTimePicker({
@@ -548,11 +548,11 @@ export default function PrincipalTimetableSettings() {
         jul_credit: 8,
         min_stretch_days: 2,
         max_stretch_days: 5,
-        eligible_roles: ['hod', 'dean', 'principal', 'coe', 'fees_manager', 'counsellor', 'driver', 'warden', 'librarian', 'lab_assistant', 'office_admin', 'group_d', 'security']
+        eligible_roles: ['hod', 'dean', 'principal', 'fees_manager', 'counsellor', 'driver', 'warden', 'librarian', 'lab_assistant', 'office_admin', 'group_d', 'security']
       },
       on_duty: {
         is_enabled: true,
-        eligible_roles: ['teacher', 'faculty', 'group_d', 'security', 'hod', 'dean', 'principal', 'coe'],
+        eligible_roles: ['teacher', 'faculty', 'group_d', 'security', 'hod', 'dean', 'principal'],
         require_initial_document: false,
         require_completion_certificate: true
       },
@@ -700,8 +700,12 @@ export default function PrincipalTimetableSettings() {
         }
         const mapping = data.staff_category_mapping;
         if (mapping && Object.keys(mapping).length > 0) {
-          const currentMapped = Object.values(mapping).flat() as string[];
-          const mergedMapping = { ...mapping };
+          const cleanedMapping: Record<string, string[]> = {};
+          Object.entries(mapping).forEach(([cat, roles]: [string, any]) => {
+            cleanedMapping[cat] = (Array.isArray(roles) ? roles : []).filter((r: string) => (r || '').toLowerCase() !== 'coe');
+          });
+          const currentMapped = Object.values(cleanedMapping).flat() as string[];
+          const mergedMapping = { ...cleanedMapping };
           Object.entries(DEFAULT_STAFF_CATEGORY_MAPPING).forEach(([cat, roles]) => {
             roles.forEach(r => {
               if (!currentMapped.includes(r)) {
@@ -777,11 +781,11 @@ export default function PrincipalTimetableSettings() {
             jul_credit: rules.earned_leave?.jul_credit ?? 8,
             min_stretch_days: rules.earned_leave?.min_stretch_days ?? 2,
             max_stretch_days: rules.earned_leave?.max_stretch_days ?? 5,
-            eligible_roles: rules.earned_leave?.eligible_roles || ['hod', 'dean', 'principal', 'coe', 'fees_manager', 'counsellor', 'driver', 'warden', 'librarian', 'lab_assistant', 'office_admin']
+            eligible_roles: (rules.earned_leave?.eligible_roles || ['hod', 'dean', 'principal', 'fees_manager', 'counsellor', 'driver', 'warden', 'librarian', 'lab_assistant', 'office_admin']).filter((r: string) => (r || '').toLowerCase() !== 'coe')
           },
           on_duty: {
             is_enabled: rules.on_duty?.is_enabled !== false,
-            eligible_roles: rules.on_duty?.eligible_roles || ['teacher', 'faculty', 'hod', 'dean', 'principal', 'coe'],
+            eligible_roles: (rules.on_duty?.eligible_roles || ['teacher', 'faculty', 'hod', 'dean', 'principal']).filter((r: string) => (r || '').toLowerCase() !== 'coe'),
             require_initial_document: Boolean(rules.on_duty?.require_initial_document),
             require_completion_certificate: rules.on_duty?.require_completion_certificate !== false
           },
@@ -870,13 +874,13 @@ export default function PrincipalTimetableSettings() {
           jul_credit: el.jul_credit === '' ? 8 : Number(el.jul_credit),
           min_stretch_days: el.min_stretch_days === '' ? 2 : Number(el.min_stretch_days),
           max_stretch_days: el.max_stretch_days === '' ? 5 : Number(el.max_stretch_days),
-          eligible_roles: el.eligible_roles || ['hod', 'dean', 'principal', 'coe', 'fees_manager', 'counsellor', 'driver', 'warden', 'librarian', 'lab_assistant', 'office_admin']
+          eligible_roles: (el.eligible_roles || ['hod', 'dean', 'principal', 'fees_manager', 'counsellor', 'driver', 'warden', 'librarian', 'lab_assistant', 'office_admin']).filter((r: string) => (r || '').toLowerCase() !== 'coe')
         };
       } else if (cardKey === 'on_duty') {
         const od = rules.on_duty || {};
         cleanedCardRule = {
           is_enabled: od.is_enabled !== false,
-          eligible_roles: od.eligible_roles || ['teacher', 'faculty', 'hod', 'dean', 'principal', 'coe'],
+          eligible_roles: (od.eligible_roles || ['teacher', 'faculty', 'hod', 'dean', 'principal']).filter((r: string) => (r || '').toLowerCase() !== 'coe'),
           require_initial_document: Boolean(od.require_initial_document),
           require_completion_certificate: od.require_completion_certificate !== false
         };
@@ -960,11 +964,11 @@ export default function PrincipalTimetableSettings() {
           jul_credit: leavePolicy.leave_policy_rules?.earned_leave?.jul_credit === '' ? 8 : Number(leavePolicy.leave_policy_rules?.earned_leave?.jul_credit),
           min_stretch_days: leavePolicy.leave_policy_rules?.earned_leave?.min_stretch_days === '' ? 2 : Number(leavePolicy.leave_policy_rules?.earned_leave?.min_stretch_days),
           max_stretch_days: leavePolicy.leave_policy_rules?.earned_leave?.max_stretch_days === '' ? 5 : Number(leavePolicy.leave_policy_rules?.earned_leave?.max_stretch_days),
-          eligible_roles: leavePolicy.leave_policy_rules?.earned_leave?.eligible_roles || ['hod', 'dean', 'principal', 'coe', 'fees_manager', 'counsellor', 'driver', 'warden', 'librarian', 'lab_assistant', 'office_admin']
+          eligible_roles: (leavePolicy.leave_policy_rules?.earned_leave?.eligible_roles || ['hod', 'dean', 'principal', 'fees_manager', 'counsellor', 'driver', 'warden', 'librarian', 'lab_assistant', 'office_admin']).filter((r: string) => (r || '').toLowerCase() !== 'coe')
         },
         on_duty: {
           is_enabled: leavePolicy.leave_policy_rules?.on_duty?.is_enabled !== false,
-          eligible_roles: leavePolicy.leave_policy_rules?.on_duty?.eligible_roles || ['teacher', 'faculty', 'hod', 'dean', 'principal', 'coe'],
+          eligible_roles: (leavePolicy.leave_policy_rules?.on_duty?.eligible_roles || ['teacher', 'faculty', 'hod', 'dean', 'principal']).filter((r: string) => (r || '').toLowerCase() !== 'coe'),
           require_initial_document: Boolean(leavePolicy.leave_policy_rules?.on_duty?.require_initial_document),
           require_completion_certificate: leavePolicy.leave_policy_rules?.on_duty?.require_completion_certificate !== false
         },
@@ -1072,6 +1076,10 @@ export default function PrincipalTimetableSettings() {
 
     try {
       setAttendanceSaving(true);
+      const cleanedMapping: Record<string, string[]> = {};
+      Object.entries(staffCategoryMapping).forEach(([cat, roles]) => {
+        cleanedMapping[cat] = (roles || []).filter(r => (r || '').toLowerCase() !== 'coe');
+      });
       const res = await fetchWithTokenRefresh(`${API_ENDPOINT}/organizations/attendance-workflow/`, {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
@@ -1082,7 +1090,7 @@ export default function PrincipalTimetableSettings() {
           allow_web_attendance: allowWebAttendance,
           require_device_id_attendance: requireDeviceIdAttendance,
           weekend_policy: weekendPolicy,
-          staff_category_mapping: staffCategoryMapping,
+          staff_category_mapping: cleanedMapping,
           category_attendance_workflows: categoryWorkflows
         })
       });
@@ -2470,7 +2478,7 @@ export default function PrincipalTimetableSettings() {
                             {/* EL Eligible Roles */}
                             {renderLeaveRoleSelector(
                               "Eligible Roles for EL",
-                              leavePolicy.leave_policy_rules?.earned_leave?.eligible_roles || ['hod', 'dean', 'principal', 'coe', 'fees_manager', 'counsellor', 'driver', 'warden', 'librarian', 'lab_assistant', 'office_admin'],
+                              (leavePolicy.leave_policy_rules?.earned_leave?.eligible_roles || ['hod', 'dean', 'principal', 'fees_manager', 'counsellor', 'driver', 'warden', 'librarian', 'lab_assistant', 'office_admin']).filter((r: string) => (r || '').toLowerCase() !== 'coe'),
                               (updated) => {
                                 setLeavePolicy(prev => ({
                                   ...prev,
@@ -2582,7 +2590,7 @@ export default function PrincipalTimetableSettings() {
                             {/* OD Eligible Roles */}
                             {renderLeaveRoleSelector(
                               "Eligible Roles for OD",
-                              leavePolicy.leave_policy_rules?.on_duty?.eligible_roles || ['teacher', 'faculty', 'hod', 'dean', 'principal', 'coe'],
+                              (leavePolicy.leave_policy_rules?.on_duty?.eligible_roles || ['teacher', 'faculty', 'hod', 'dean', 'principal']).filter((r: string) => (r || '').toLowerCase() !== 'coe'),
                               (updated) => {
                                 setLeavePolicy(prev => ({
                                   ...prev,
@@ -3116,7 +3124,7 @@ export default function PrincipalTimetableSettings() {
                               } else if (item.roleKey === 'hod') {
                                 newStages = ['dean', 'principal'];
                               } else if (item.roleKey === 'principal') {
-                                newStages = ['dean', 'coe'];
+                                newStages = ['dean'];
                               } else if (item.roleKey === 'warden') {
                                 newStages = ['hms_admin', 'principal'];
                               } else if (item.roleKey === 'driver') {
@@ -3124,15 +3132,15 @@ export default function PrincipalTimetableSettings() {
                               } else if (item.roleKey === 'counsellor') {
                                 newStages = ['admission_manager', 'principal'];
                               } else {
-                                newStages = [defaultFallbackApprover, item.roleKey === 'principal' ? 'coe' : 'principal'];
+                                newStages = [defaultFallbackApprover, 'principal'];
                               }
                             } else if (count === 3) {
                               if (item.roleKey === 'hod') {
-                                newStages = ['dean', 'coe', 'principal'];
+                                newStages = ['dean', 'principal'];
                               } else if (item.roleKey === 'teacher' || item.roleKey === 'group_d' || item.roleKey === 'security') {
                                 newStages = ['hod', 'dean', 'principal'];
                               } else if (item.roleKey === 'principal') {
-                                newStages = ['dean', 'coe', 'fees_manager'];
+                                newStages = ['dean', 'fees_manager'];
                               } else {
                                 newStages = ['hms_admin', 'dean', 'principal'].filter(r => r !== item.roleKey);
                                 while (newStages.length < 3) {
@@ -3544,7 +3552,9 @@ export default function PrincipalTimetableSettings() {
                                 <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground border-b pb-2">{col.label}</div>
                                 <div className="space-y-2">
                                   {/* List roles mapped to this category */}
-                                  {(staffCategoryMapping[col.key] || []).map((mappedRole) => {
+                                  {(staffCategoryMapping[col.key] || [])
+                                    .filter((r) => (r || '').toLowerCase() !== 'coe')
+                                    .map((mappedRole) => {
                                     const roleDef = AVAILABLE_ROLES.find(r => r.value === mappedRole) || { label: mappedRole, value: mappedRole };
                                     return (
                                       <div key={mappedRole} className="flex items-center justify-between bg-primary/5 text-primary text-xs px-2 py-1.5 rounded">
