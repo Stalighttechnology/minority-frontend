@@ -163,10 +163,10 @@ export const fetchWithTokenRefresh = async (url: string, options: RequestInit = 
     }
 
     // Ensure Authorization header is set only when we have a token. Also include session/device identifiers.
-    const sessionId = (typeof window !== 'undefined') ? localStorage.getItem('session_id') : undefined;
+    const sessionId = (typeof window !== 'undefined') ? (sessionStorage.getItem('session_id') || localStorage.getItem('session_id')) : undefined;
     const deviceId = getOrCreateDeviceId();
-    const selectedStudentId = (typeof window !== 'undefined') ? localStorage.getItem('selectedStudentId') : undefined;
-    const selectedOrgId = (typeof window !== 'undefined') ? localStorage.getItem('selectedOrgId') : undefined;
+    const selectedStudentId = (typeof window !== 'undefined') ? (sessionStorage.getItem('selectedStudentId') || localStorage.getItem('selectedStudentId')) : undefined;
+    const selectedOrgId = (typeof window !== 'undefined') ? (sessionStorage.getItem('selectedOrgId') || localStorage.getItem('selectedOrgId')) : undefined;
     
     const safeHeaders = {
       ...(options.headers as Record<string, string | undefined>),

@@ -109,17 +109,17 @@ export const Navbar = ({
 
   const [childrenList, setChildrenList] = useState<any[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(
-    localStorage.getItem("selectedStudentId")
+    sessionStorage.getItem("selectedStudentId")
   );
   const [showParentDropdown, setShowParentDropdown] = useState(false);
   const [showDesktopSwitcher, setShowDesktopSwitcher] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const desktopSwitcherRef = useRef<HTMLDivElement>(null);
 
-  // Multi-Organization management for Org Admins
+  // Multi-Organization management for Org Admins (in-memory & session-based, zero localStorage)
   const [organizationsList, setOrganizationsList] = useState<any[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(
-    localStorage.getItem("selectedOrgId")
+    sessionStorage.getItem("selectedOrgId")
   );
   const [showOrgSwitcher, setShowOrgSwitcher] = useState(false);
   const [showAddCollegeModal, setShowAddCollegeModal] = useState(false);
@@ -169,16 +169,16 @@ export const Navbar = ({
     if (role === "parent") {
       const fetchChildren = async () => {
         try {
-          const { fetchWithTokenRefresh } = await import("../../utils/authService");
+          const { fetchWithTokenRefresh } = await import("../../utils/student_api");
           const data = await fetchParentChildrenCached(fetchWithTokenRefresh, API_BASE_URL);
           if (data.success && data.children) {
             setChildrenList(data.children);
-            const currentSavedId = localStorage.getItem("selectedStudentId");
+            const currentSavedId = sessionStorage.getItem("selectedStudentId");
             if (
               data.children.length > 0 &&
               (!currentSavedId || currentSavedId === "null" || currentSavedId === "undefined")
             ) {
-              localStorage.setItem("selectedStudentId", data.children[0].id.toString());
+              sessionStorage.setItem("selectedStudentId", data.children[0].id.toString());
               setSelectedChildId(data.children[0].id.toString());
             }
           }
@@ -197,7 +197,7 @@ export const Navbar = ({
       const data = await res.json();
       if (res.ok && data.success && data.organizations) {
         setOrganizationsList(data.organizations);
-        const currentSavedOrgId = localStorage.getItem("selectedOrgId");
+        const currentSavedOrgId = sessionStorage.getItem("selectedOrgId");
         if (
           data.organizations.length > 0 &&
           (!currentSavedOrgId || currentSavedOrgId === "null" || currentSavedOrgId === "undefined")
@@ -205,7 +205,7 @@ export const Navbar = ({
           const defaultId = data.active_org_id
             ? data.active_org_id.toString()
             : data.organizations[0].id.toString();
-          localStorage.setItem("selectedOrgId", defaultId);
+          sessionStorage.setItem("selectedOrgId", defaultId);
           setSelectedOrgId(defaultId);
         } else if (currentSavedOrgId) {
           setSelectedOrgId(currentSavedOrgId);
@@ -219,6 +219,20 @@ export const Navbar = ({
   useEffect(() => {
     if (role === "org_admin") {
       fetchOrganizations();
+
+      const handleRefresh = (e: any) => {
+        if (e.detail?.newOrgId) {
+          const newId = e.detail.newOrgId.toString();
+          sessionStorage.setItem("selectedOrgId", newId);
+          setSelectedOrgId(newId);
+        }
+        fetchOrganizations();
+      };
+
+      window.addEventListener("refresh-linked-organizations", handleRefresh);
+      return () => {
+        window.removeEventListener("refresh-linked-organizations", handleRefresh);
+      };
     }
   }, [role]);
 
@@ -492,7 +506,7 @@ export const Navbar = ({
                     <button
                       key={org.id}
                       onClick={() => {
-                        localStorage.setItem("selectedOrgId", org.id.toString());
+                        sessionStorage.setItem("selectedOrgId", org.id.toString());
                         setSelectedOrgId(org.id.toString());
                         setShowOrgSwitcher(false);
                         window.location.reload();
@@ -506,9 +520,12 @@ export const Navbar = ({
                     <button
                       onClick={() => {
                         setShowOrgSwitcher(false);
-                        setShowAddCollegeModal(true);
+                        if (setPage) {
+                          setPage("create-organization");
+                        }
+                        navigate("/org-admin/create-organization");
                       }}
-                      className="w-full flex items-center justify-center gap-1 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg"
+                      className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" /> Add School / Institution
                     </button>
@@ -612,7 +629,7 @@ export const Navbar = ({
         onSuccess={(newOrg) => {
           fetchOrganizations();
           if (newOrg?.id) {
-            localStorage.setItem("selectedOrgId", newOrg.id.toString());
+            sessionStorage.setItem("selectedOrgId", newOrg.id.toString());
             setSelectedOrgId(newOrg.id.toString());
             window.location.reload();
           }

@@ -37,6 +37,40 @@ export const INDIAN_STATES_AND_DISTRICTS: Record<string, string[]> = {
   "West Bengal": ["Alipurduar", "Bankura", "Birbhum", "Cooch Behar", "Dakshin Dinajpur (South Dinajpur)", "Darjeeling", "Hooghly", "Howrah", "Jalpaiguri", "Jhargram", "Kalimpong", "Kolkata", "Malda", "Murshidabad", "Nadia", "North 24 Parganas", "Paschim Medinipur (West Medinipur)", "Paschim (West) Burdwan (Bardhaman)", "Purba Burdwan (Bardhaman)", "Purba Medinipur (East Medinipur)", "Purulia", "South 24 Parganas", "Uttar Dinajpur (North Dinajpur)"]
 };
 
+export const KARNATAKA_DISTRICT_TALUKS: Record<string, string[]> = {
+  "Bagalkot": ["Bagalkot", "Badami", "Bilagi", "Hungund", "Jamkhandi", "Mudhol", "Guledgudda", "Rabkavi Banhatti", "Ilkal"],
+  "Ballari (Bellary)": ["Ballari", "Kurugodu", "Kampli", "Sandur", "Siruguppa"],
+  "Belagavi (Belgaum)": ["Belagavi", "Athani", "Bailhongal", "Chikkodi", "Gokak", "Hukkeri", "Khanapur", "Raybag", "Ramdurg", "Saundatti", "Kagawad", "Mudalagi", "Kittur", "Nipani"],
+  "Bengaluru (Bangalore) Rural": ["Devanahalli", "Doddaballapura", "Hosakote", "Nelamangala"],
+  "Bengaluru (Bangalore) Urban": ["Bengaluru North", "Bengaluru South", "Bengaluru East", "Anekal", "Yelahanka"],
+  "Bidar": ["Bidar", "Basavakalyan", "Bhalki", "Homnabad", "Aurad", "Hulsoor", "Kamalnagar"],
+  "Chamarajanagar": ["Chamarajanagar", "Gundlupet", "Kollegal", "Yelandur", "Hanur"],
+  "Chikballapur": ["Chikballapur", "Bagepalli", "Chintamani", "Gauribidanur", "Gudibanda", "Sidlaghatta"],
+  "Chikkamagaluru (Chikmagalur)": ["Chikkamagaluru", "Kadur", "Koppa", "Mudigere", "Narasimharajapura", "Sringeri", "Tarikere", "Ajjampura", "Kalasa"],
+  "Chitradurga": ["Chitradurga", "Challakere", "Hiriyur", "Holalkere", "Hosadurga", "Molakalmuru"],
+  "Dakshina Kannada": ["Mangaluru", "Bantwal", "Belthangady", "Puttur", "Sullia", "Moodabidri", "Kadaba"],
+  "Davangere": ["Davangere", "Harihar", "Honnali", "Channagiri", "Jagalur", "Nyamathi"],
+  "Dharwad": ["Dharwad", "Hubballi (Urban)", "Hubballi (Rural)", "Kundgol", "Navalgund", "Alnavar", "Annigeri"],
+  "Gadag": ["Gadag", "Nargund", "Mundargi", "Ron", "Shirhatti", "Gajendragad", "Lakshmeshwar"],
+  "Hassan": ["Hassan", "Alur", "Arkalgud", "Arsikere", "Belur", "Channarayapatna", "Holenarasipura", "Sakleshpur"],
+  "Haveri": ["Haveri", "Byadgi", "Hangal", "Hirekerur", "Ranebennur", "Savanur", "Shiggaon", "Rattihalli"],
+  "Kalaburagi (Gulbarga)": ["Kalaburagi", "Afzalpur", "Aland", "Chincholi", "Chitapur", "Jevargi", "Sedam", "Kamalapur", "Shahabad", "Kalagi"],
+  "Kodagu": ["Madikeri", "Somwarpet", "Virajpet", "Kushalnagar", "Ponnampet"],
+  "Kolar": ["Kolar", "Bangarapet", "Malur", "Mulbagal", "Srinivaspur", "KGF"],
+  "Koppal": ["Koppal", "Gangavathi", "Kushtagi", "Yelburga", "Kanakagiri", "Karatagi", "Kukanoor"],
+  "Mandya": ["Mandya", "Maddur", "Malavalli", "Pandavapura", "Nagamangala", "Krishnarajpet", "Srirangapatna"],
+  "Mysuru (Mysore)": ["Mysuru", "Hunsur", "Krishnarajanagara", "Nanjangud", "Heggadadevankote", "Piriyapatna", "T. Narasipura", "Saragur", "Saligrama"],
+  "Raichur": ["Raichur", "Devadurga", "Lingsugur", "Manvi", "Sindhanur", "Maski", "Sirwar"],
+  "Ramanagara": ["Ramanagara", "Channapatna", "Kanakapura", "Magadi"],
+  "Shivamogga (Shimoga)": ["Shivamogga", "Bhadravathi", "Hosanagara", "Sagar", "Shikaripura", "Soraba", "Thirthahalli"],
+  "Tumakuru (Tumkur)": ["Tumakuru", "Chikkanayakanahalli", "Gubbi", "Koratagere", "Kunigal", "Madhugiri", "Pavagada", "Sira", "Tiptur", "Turuvekere"],
+  "Udupi": ["Udupi", "Kundapura", "Karkala", "Byndoor", "Brahmavara", "Kaup", "Hebri"],
+  "Uttara Kannada (Karwar)": ["Karwar", "Ankola", "Kumta", "Honnavar", "Bhatkal", "Sirsi", "Siddapur", "Yellapur", "Mundgod", "Haliyal", "Joida", "Dandeli"],
+  "Vijayapura (Bijapur)": ["Vijayapura", "Basavana Bagewadi", "Indi", "Muddebihal", "Sindagi", "Chadchan", "Tikota", "Babaleshwar", "Kolhar", "Nidagundi", "Devara Hipparagi", "Talikoti"],
+  "Yadgir": ["Yadgir", "Shahapur", "Shorapur", "Gurmitkal", "Vadagera", "Hunsagi"],
+  "Vijayanagara": ["Hosapete", "Harapanahalli", "Huvina Hadagali", "Hagaribommanahalli", "Kotturu", "Kudligi"]
+};
+
 export const getIndianStates = () => Object.keys(INDIAN_STATES_AND_DISTRICTS).sort();
 
 export const getDistrictsForState = (state: string) => {
@@ -57,3 +91,52 @@ export const getDistrictsForState = (state: string) => {
   }
   return [];
 };
+
+export const getTaluksForDistrict = (district: string): string[] => {
+  if (KARNATAKA_DISTRICT_TALUKS[district]) {
+    return KARNATAKA_DISTRICT_TALUKS[district];
+  }
+  const normalized = district.trim().toLowerCase();
+  const key = Object.keys(KARNATAKA_DISTRICT_TALUKS).find(
+    k => k.toLowerCase() === normalized || normalized.includes(k.toLowerCase()) || k.toLowerCase().includes(normalized)
+  );
+  if (key) {
+    return KARNATAKA_DISTRICT_TALUKS[key];
+  }
+  return [];
+};
+
+export const TALUK_VILLAGES: Record<string, string[]> = {
+  "Bengaluru North": ["Peenya", "Yeshwanthpur", "Jalahalli", "Hebbal", "Malleshwaram", "Mathikere", "Vidyaranyapura", "HMT Colony", "Chikkabanavara", "Dasarahalli", "T. Dasarahalli", "Hesaraghatta"],
+  "Bengaluru South": ["Jayanagar", "JP Nagar", "Banashankari", "Basavanagudi", "Padmanabhanagar", "Uttarahalli", "Kengeri", "Konanakunte", "Giri Nagar", "Kumaraswamy Layout", "Anjanapura", "Begur"],
+  "Bengaluru East": ["Indiranagar", "K.R. Puram", "Whitefield", "Marathahalli", "Mahadevapura", "HAL", "Varthur", "Hoodi", "Bellandur", "CV Raman Nagar", "Ramamurthy Nagar", "Kadugodi"],
+  "Anekal": ["Anekal Town", "Attibele", "Chandapura", "Electronic City", "Jigani", "Sarjapura", "Hebbagodi", "Marsur", "Bannerghatta", "Mayasandra", "Dommasandra"],
+  "Yelahanka": ["Yelahanka Old Town", "Yelahanka New Town", "Sahakara Nagar", "Amruthahalli", "Jakkur", "Thanisandra", "Bagalur", "Kogilu", "Singanayakanahalli", "Attur"],
+  "Devanahalli": ["Devanahalli Town", "Kempegowda Int. Area", "Vijayapura", "Kundana", "Channarayapatna", "Bidalur", "Avathi", "Bettakote"],
+  "Doddaballapura": ["Doddaballapura Town", "Tubagere", "Sasalu", "Kasaba", "Doddabelavangala", "Madure", "Aralumallige"],
+  "Hosakote": ["Hosakote Town", "Anugondanahalli", "Jadigenahalli", "Nandagudi", "Sulibele", "Kasaba", "Mallasandra"],
+  "Nelamangala": ["Nelamangala Town", "Sompura", "Dabaspete", "Tyamagondlu", "Kasaba", "Shivagange", "Binnamangala"],
+  "Mysuru": ["Vijayanagar", "Kuvempunagar", "Saraswathipuram", "Gokulam", "Jayalakshmipuram", "Hebbal Industrial Area", "Ramakrishnanagar", "Bannimantap", "Chamundipuram", "Vidyaranyapuram", "Alanahalli"],
+  "Mangaluru": ["Hampankatta", "Kadri", "Kodialbail", "Kankanady", "Bejai", "Surathkal", "Panambur", "Ullal", "Kavoor", "Bondel", "Derebail", "Urwa"],
+  "Belagavi": ["Tilakwadi", "Camp", "Vadgaon", "Shahapur", "Udyambag", "Khasbag", "Macche", "Peeranwadi", "Kakati", "Hindalga"],
+  "Hubballi (Urban)": ["Vidyanagar", "Keshwapur", "Gokul Road", "Navanagar", "Bengeri", "Unkal", "Old Hubli", "Deshpande Nagar", "Shirur Park"],
+  "Dharwad": ["Saptapur", "Malmaddi", "Kelgeri", "Sadhankeri", "Navalur", "Narendra", "Garag", "Tegur", "Hebballi"],
+  "Kalaburagi": ["Brahampur", "Khuba Plot", "Station Area", "Aiwan-e-Shahi", "Kotnoor", "Sedam Road", "Kusnoor", "Hagarga", "Tawargera"],
+  "Tumakuru": ["Batawadi", "Kyathsandra", "SS Puram", "Gokula Extension", "Maralur", "Shettihalli", "Belagumba", "Hirehalli", "Mallasandra"],
+  "Udupi": ["Manipal", "Santhekatte", "Malpe", "Kadiyali", "Ambalpady", "Brahmagiri", "Indrali", "Bannanje", "Parkala"]
+};
+
+export const getVillagesForTaluk = (taluk: string): string[] => {
+  if (TALUK_VILLAGES[taluk]) {
+    return TALUK_VILLAGES[taluk];
+  }
+  const normalized = taluk.trim().toLowerCase();
+  const key = Object.keys(TALUK_VILLAGES).find(
+    k => k.toLowerCase() === normalized || normalized.includes(k.toLowerCase()) || k.toLowerCase().includes(normalized)
+  );
+  if (key) {
+    return TALUK_VILLAGES[key];
+  }
+  return [];
+};
+

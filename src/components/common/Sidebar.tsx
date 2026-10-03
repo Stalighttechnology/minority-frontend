@@ -109,10 +109,10 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
   const [orgLogo, setOrgLogo] = useState(initialUser?.org_logo || "/org logo.png");
 
   const [childrenList, setChildrenList] = useState<any[]>([]);
-  const [selectedChildId, setSelectedChildId] = useState<string | null>(localStorage.getItem('selectedStudentId'));
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(sessionStorage.getItem('selectedStudentId') || localStorage.getItem('selectedStudentId'));
 
   const [organizationsList, setOrganizationsList] = useState<any[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(localStorage.getItem('selectedOrgId'));
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(sessionStorage.getItem('selectedOrgId') || localStorage.getItem('selectedOrgId'));
 
   // Substitute requests notification state (Apply Leave)
   const [pendingSubstituteCount, setPendingSubstituteCount] = useState<number>(0);
@@ -265,10 +265,10 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
           const data = await res.json();
           if (res.ok && data.success && data.organizations) {
             setOrganizationsList(data.organizations);
-            const currentSavedOrgId = localStorage.getItem('selectedOrgId');
+            const currentSavedOrgId = sessionStorage.getItem('selectedOrgId') || localStorage.getItem('selectedOrgId');
             if (data.organizations.length > 0 && (!currentSavedOrgId || currentSavedOrgId === 'null' || currentSavedOrgId === 'undefined')) {
               const defaultId = data.active_org_id ? data.active_org_id.toString() : data.organizations[0].id.toString();
-              localStorage.setItem('selectedOrgId', defaultId);
+              sessionStorage.setItem('selectedOrgId', defaultId);
               setSelectedOrgId(defaultId);
             } else if (currentSavedOrgId) {
               setSelectedOrgId(currentSavedOrgId);
@@ -510,6 +510,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
       "alumni-directory": <GraduationCap size={20} />,
       "external-links": <Link size={20} />,
       "college-details": <Building2 size={20} />,
+      "create-organization": <Building2 size={20} />,
       "issued-items": <Package size={20} />,
       "my-issued-items": <Gift size={20} />,
       "sports-wellness": <Activity size={20} />,
@@ -594,6 +595,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
     ],
     org_admin: [
       { name: "Dashboard", page: "dashboard" },
+      { name: "Add Institution", page: "create-organization" },
       { name: getTerm("branches"), page: "branches" },
       { name: "Batches", page: "batches" },
       // { name: "Faculty", page: "faculty" },
@@ -1157,7 +1159,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
           <Select
             value={selectedOrgId || undefined}
             onValueChange={(val) => {
-              localStorage.setItem('selectedOrgId', val);
+              sessionStorage.setItem('selectedOrgId', val);
               setSelectedOrgId(val);
               window.location.reload();
             }}

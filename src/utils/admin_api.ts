@@ -271,12 +271,15 @@ interface ManageAdminProfileResponse {
 
 let adminStatsPromise: Promise<AdminStatsResponse> | null = null;
 let adminStatsTimestamp = 0;
+let adminStatsCachedOrgId: string | null = null;
 
 export const getAdminStats = async (): Promise<AdminStatsResponse> => {
+  const currentOrgId = typeof window !== 'undefined' ? (sessionStorage.getItem('selectedOrgId') || localStorage.getItem('selectedOrgId')) : null;
   const now = Date.now();
-  if (adminStatsPromise && now - adminStatsTimestamp < 5000) {
+  if (adminStatsPromise && adminStatsCachedOrgId === currentOrgId && now - adminStatsTimestamp < 5000) {
     return adminStatsPromise;
   }
+  adminStatsCachedOrgId = currentOrgId;
 
   adminStatsPromise = (async () => {
     try {

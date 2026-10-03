@@ -37,6 +37,7 @@ import { InventoryHub } from "../inventory/InventoryHub";
 import CollegeDetailsPage from "../college_details/CollegeDetailsPage";
 import CollegeIssuedItemsPage from "../issued_items/CollegeIssuedItemsPage";
 import SportsWellnessPage from "../sports_wellness/SportsWellnessPage";
+import CreateOrganizationPage from "../org_admin/CreateOrganizationPage";
 
 interface OrgAdminDashboardProps {
   user: any;
@@ -72,6 +73,10 @@ const OrgAdminDashboard = ({ user, setPage }: OrgAdminDashboardProps) => {
     switch (activePage) {
       case "dashboard":
         return <AdminStats setError={setError} onNavigate={handlePageChange} />;
+
+      case "create-organization":
+      case "add-institution":
+        return <CreateOrganizationPage onNavigate={handlePageChange} />;
 
       case "college-details":
         return <CollegeDetailsPage userRole="org_admin" />;
