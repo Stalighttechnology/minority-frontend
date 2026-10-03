@@ -46,6 +46,7 @@ export const getLanguage = (): AppLanguage => {
 const setCookie = (name: string, value: string, days: number = 365) => {
   const expires = new Date(Date.now() + days * 864e5).toUTCString();
   document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Lax`;
+  document.cookie = `${name}=${value}; expires=${expires}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
   const hostParts = window.location.hostname.split('.');
   if (hostParts.length > 1) {
     const rootDomain = '.' + hostParts.slice(-2).join('.');
@@ -55,6 +56,7 @@ const setCookie = (name: string, value: string, days: number = 365) => {
 
 const removeCookie = (name: string) => {
   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
   const hostParts = window.location.hostname.split('.');
   if (hostParts.length > 1) {
     const rootDomain = '.' + hostParts.slice(-2).join('.');

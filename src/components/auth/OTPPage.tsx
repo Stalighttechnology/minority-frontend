@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { verifyOTP, resendOTP } from "../../utils/authService";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Shield, ArrowLeft, RotateCcw, CheckCircle } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { getLanguage, setLanguage, onLanguageChange, AppLanguage } from "../../utils/languageManager";
 
 interface OTPPageProps {
   setRole: (role: string) => void;
@@ -16,6 +16,22 @@ interface OTPPageProps {
 const OTPPage = ({ setRole, setPage, setUser }: OTPPageProps) => {
   const navigate = useNavigate();
   const { setTokens } = useAuth();
+  const [currentLang, setCurrentLang] = useState<AppLanguage>(getLanguage());
+
+  useEffect(() => {
+    const unsubscribe = onLanguageChange((newLang) => {
+      setCurrentLang(newLang);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleToggleLang = (lang: AppLanguage) => {
+    if (lang !== currentLang) {
+      setCurrentLang(lang);
+      setLanguage(lang);
+    }
+  };
+
   const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -171,19 +187,54 @@ const OTPPage = ({ setRole, setPage, setUser }: OTPPageProps) => {
 
   return (
     <div
-      className="min-h-screen flex flex-col justify-between font-sans bg-cover bg-center relative notranslate"
+      className="min-h-screen flex flex-col justify-between font-sans bg-cover bg-center relative"
       style={{
-        backgroundImage: `linear-gradient(to right, rgba(7, 25, 47, 0.62), rgba(11, 41, 75, 0.40), rgba(8, 28, 54, 0.65)), url('/desktop image.jpg')`,
+        backgroundImage: `linear-gradient(to right, rgba(7, 25, 47, 0.65), rgba(11, 41, 75, 0.45), rgba(8, 28, 54, 0.70)), url('/desktop image.jpg')`,
       }}
     >
       {/* Top Karnataka Flag Ribbon */}
-      <div className="w-full h-1.5 flex shadow-sm z-20">
+      <div className="w-full h-1.5 flex shadow-sm z-20 notranslate">
         <div className="w-1/2 h-full bg-[#DC2626]" title="Karnataka State Flag - Red" />
         <div className="w-1/2 h-full bg-[#EAB308]" title="Karnataka State Flag - Yellow" />
       </div>
 
+      {/* Top Header with Kannada / English Language Switcher */}
+      <header className="w-full bg-black/20 backdrop-blur-md border-b border-white/10 px-6 py-2.5 z-20">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="text-xs font-semibold text-white/90 tracking-wide">
+            ಕರ್ನಾಟಕ ಸರ್ಕಾರ • Government of Karnataka
+          </div>
+
+          {/* Bilingual English / Kannada Switcher */}
+          <div className="flex items-center bg-white/10 backdrop-blur-md border border-white/20 rounded-lg p-0.5 text-xs font-semibold shadow-sm notranslate">
+            <button
+              type="button"
+              onClick={() => handleToggleLang("en")}
+              className={`px-3 py-1 rounded-md transition-all duration-200 ${
+                currentLang === "en"
+                  ? "bg-white text-[#0F3F73] font-bold shadow-sm"
+                  : "text-white/80 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              English
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggleLang("kn")}
+              className={`px-3 py-1 rounded-md transition-all duration-200 ${
+                currentLang === "kn"
+                  ? "bg-[#EAB308] text-[#0A2647] font-bold shadow-sm"
+                  : "text-white/80 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              ಕನ್ನಡ
+            </button>
+          </div>
+        </div>
+      </header>
+
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-6 sm:p-10 lg:p-16 gap-8 lg:gap-16 max-w-7xl mx-auto w-full z-10">
+      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-6 sm:p-10 lg:p-16 gap-10 lg:gap-20 max-w-7xl mx-auto w-full z-10">
         {/* Left Section: Branding & Emblem */}
         <motion.div
           className="flex-1 text-white max-w-xl text-center lg:text-left space-y-6"
@@ -225,20 +276,17 @@ const OTPPage = ({ setRole, setPage, setUser }: OTPPageProps) => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/40 dark:border-slate-800 p-7 sm:p-9 text-slate-900 dark:text-white">
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[#0F3F73]/10 dark:bg-primary/20 text-[#0F3F73] dark:text-primary mb-2">
-                <Shield className="w-5 h-5" />
-              </div>
-              <h2 className="text-xl font-bold text-[#0F3F73] dark:text-white">Verify Your Identity</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/40 dark:border-slate-800 p-8 sm:p-9 text-slate-900 dark:text-white">
+            <div className="text-left mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <h2 className="text-2xl font-bold tracking-tight text-[#0F3F73] dark:text-white">Verify Your Identity</h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
                 Enter the 6-digit verification code sent to your registered email
               </p>
             </div>
 
             {error && (
               <motion.div
-                className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-xs mb-4"
+                className="bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-xl text-xs sm:text-sm mb-4 font-medium"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3 }}
@@ -249,7 +297,7 @@ const OTPPage = ({ setRole, setPage, setUser }: OTPPageProps) => {
 
             {success && (
               <motion.div
-                className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 rounded-lg text-xs mb-4"
+                className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3.5 rounded-xl text-xs sm:text-sm mb-4 font-medium"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3 }}
@@ -263,25 +311,22 @@ const OTPPage = ({ setRole, setPage, setUser }: OTPPageProps) => {
                 <label htmlFor="otp" className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                   6-Digit Verification Code
                 </label>
-                <div className="relative">
-                  <Shield className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-                  <Input
-                    id="otp"
-                    type="text"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="Enter code"
-                    className="pl-10 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#0F3F73] focus:ring-[#0F3F73]/20 rounded-xl h-11 text-center text-lg tracking-widest font-bold transition-all"
-                    onKeyPress={(e) => e.key === "Enter" && handleVerifyOTP()}
-                    maxLength={6}
-                  />
-                </div>
+                <Input
+                  id="otp"
+                  type="text"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="000000"
+                  className="px-4 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#0F3F73] focus:ring-2 focus:ring-[#0F3F73]/20 rounded-xl h-12 text-center text-xl tracking-[0.3em] font-bold transition-all"
+                  onKeyPress={(e) => e.key === "Enter" && handleVerifyOTP()}
+                  maxLength={6}
+                />
               </div>
 
               <Button
                 onClick={handleVerifyOTP}
                 disabled={loading}
-                className="w-full bg-[#0F3F73] hover:bg-[#0B335E] text-white font-bold rounded-xl h-11 shadow-lg shadow-[#0F3F73]/25 transition-all mt-2"
+                className="w-full bg-[#0F3F73] hover:bg-[#0B335E] text-white font-bold rounded-xl h-11 shadow-md shadow-[#0F3F73]/25 hover:shadow-lg transition-all mt-2"
               >
                 {loading ? (
                   <div className="flex items-center justify-center gap-2">
@@ -289,10 +334,7 @@ const OTPPage = ({ setRole, setPage, setUser }: OTPPageProps) => {
                     Verifying Code...
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center gap-2">
-                    <CheckCircle className="h-4 w-4" />
-                    Verify & Proceed
-                  </div>
+                  "Verify & Proceed"
                 )}
               </Button>
 
@@ -300,9 +342,8 @@ const OTPPage = ({ setRole, setPage, setUser }: OTPPageProps) => {
                 <button
                   type="button"
                   onClick={() => setPage("login")}
-                  className="flex-1 px-3 py-2 text-slate-600 dark:text-slate-300 hover:text-[#0F3F73] text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="flex-1 px-3 py-2 text-slate-600 dark:text-slate-300 hover:text-[#0F3F73] text-xs font-semibold transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
-                  <ArrowLeft className="h-3 w-3" />
                   Back to Sign In
                 </button>
 
@@ -310,9 +351,8 @@ const OTPPage = ({ setRole, setPage, setUser }: OTPPageProps) => {
                   type="button"
                   onClick={handleResendOTP}
                   disabled={resendDisabled}
-                  className="flex-1 px-3 py-2 text-[#0F3F73] dark:text-amber-400 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+                  className="flex-1 px-3 py-2 text-[#0F3F73] dark:text-amber-400 text-xs font-semibold transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
                 >
-                  <RotateCcw className="h-3 w-3" />
                   {resendDisabled ? `Resend (${countdown}s)` : "Resend OTP"}
                 </button>
               </div>

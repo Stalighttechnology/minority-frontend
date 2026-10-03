@@ -1,9 +1,10 @@
-import { Eye, EyeOff, Lock, User, ShieldCheck } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useLoginLogic } from "../../hooks/useLoginLogic";
-import { useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { NavigationBar } from "@capgo/capacitor-navigation-bar";
+import { getLanguage, setLanguage, onLanguageChange, AppLanguage } from "../../utils/languageManager";
 
 interface LoginMobileProps {
   setRole: (role: string) => void;
@@ -12,6 +13,22 @@ interface LoginMobileProps {
 }
 
 const LoginMobile = ({ setRole, setPage, setUser }: LoginMobileProps) => {
+  const [currentLang, setCurrentLang] = useState<AppLanguage>(getLanguage());
+
+  useEffect(() => {
+    const unsubscribe = onLanguageChange((newLang) => {
+      setCurrentLang(newLang);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleToggleLang = (lang: AppLanguage) => {
+    if (lang !== currentLang) {
+      setCurrentLang(lang);
+      setLanguage(lang);
+    }
+  };
+
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       StatusBar.setOverlaysWebView({ overlay: true }).catch(() => { });
@@ -44,7 +61,7 @@ const LoginMobile = ({ setRole, setPage, setUser }: LoginMobileProps) => {
 
   return (
     <div
-      className="min-h-[100dvh] overflow-x-hidden overflow-y-auto flex flex-col justify-between w-full bg-transparent relative notranslate"
+      className="min-h-[100dvh] overflow-x-hidden overflow-y-auto flex flex-col justify-between w-full bg-transparent relative"
       style={{
         paddingTop: Capacitor.getPlatform() === 'android'
           ? 'max(2.5rem, env(safe-area-inset-top, 0px))'
@@ -53,9 +70,38 @@ const LoginMobile = ({ setRole, setPage, setUser }: LoginMobileProps) => {
       }}
     >
       {/* Top Karnataka Flag Accent */}
-      <div className="w-full h-1 flex shrink-0 shadow-sm">
+      <div className="w-full h-1 flex shrink-0 shadow-sm notranslate">
         <div className="w-1/2 h-full bg-[#DC2626]" />
         <div className="w-1/2 h-full bg-[#EAB308]" />
+      </div>
+
+      {/* Top Sub-header with Language Switcher */}
+      <div className="flex items-center justify-between px-4 pt-2 pb-1 notranslate">
+        <span className="text-[10px] font-semibold text-white/80">ಕರ್ನಾಟಕ ಸರ್ಕಾರ</span>
+        <div className="flex items-center bg-white/10 backdrop-blur-md border border-white/20 rounded-lg p-0.5 text-[11px] font-semibold">
+          <button
+            type="button"
+            onClick={() => handleToggleLang("en")}
+            className={`px-2.5 py-0.5 rounded transition-all ${
+              currentLang === "en"
+                ? "bg-white text-[#0F3F73] font-bold shadow-sm"
+                : "text-white/80 hover:text-white"
+            }`}
+          >
+            English
+          </button>
+          <button
+            type="button"
+            onClick={() => handleToggleLang("kn")}
+            className={`px-2.5 py-0.5 rounded transition-all ${
+              currentLang === "kn"
+                ? "bg-[#EAB308] text-[#0A2647] font-bold shadow-sm"
+                : "text-white/80 hover:text-white"
+            }`}
+          >
+            ಕನ್ನಡ
+          </button>
+        </div>
       </div>
 
       {/* HEADER: Official Emblem & Government Titles */}
@@ -83,15 +129,15 @@ const LoginMobile = ({ setRole, setPage, setUser }: LoginMobileProps) => {
 
       {/* MAIN CONTENT: Login Card */}
       <div className="flex-1 flex flex-col justify-center px-4 max-w-sm w-full mx-auto py-2">
-        <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-5 border border-white/40 transition-all">
+        <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 border border-white/40 transition-all">
           {/* Card Header */}
           <div className="mb-4 text-center">
-            <h2 className="text-[#0F3F73] text-lg font-bold">Portal Sign In</h2>
-            <p className="text-slate-500 text-xs mt-0.5">Sign in to access your administrative workspace</p>
+            <h2 className="text-[#0F3F73] text-xl font-bold">Sign In</h2>
+            <p className="text-slate-500 text-xs mt-0.5">Enter your credentials to access the portal</p>
           </div>
 
           {error && (
-            <div className="bg-red-50 text-red-700 text-xs py-2 px-3 rounded-lg mb-3 border border-red-200 leading-tight">
+            <div className="bg-red-50 text-red-700 text-xs py-2.5 px-3 rounded-xl mb-3 border border-red-200 font-medium leading-tight">
               {error}
             </div>
           )}
@@ -101,16 +147,15 @@ const LoginMobile = ({ setRole, setPage, setUser }: LoginMobileProps) => {
             {/* Username Field */}
             <div>
               <label className="text-xs font-semibold uppercase text-slate-700 mb-1 block">Username / USN</label>
-              <div className={`flex items-center gap-2.5 bg-slate-50 border ${error ? 'border-red-300' : 'border-slate-200'} rounded-xl h-11 px-3.5`}>
-                <User className={`w-4 h-4 ${error ? 'text-red-400' : 'text-slate-400'} shrink-0`} />
+              <div className={`bg-slate-50 border ${error ? 'border-red-300' : 'border-slate-200'} rounded-xl h-11 px-3.5 flex items-center`}>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   onKeyDown={handleKeyPress}
-                  placeholder="Enter username"
+                  placeholder="Enter username or ID"
                   disabled={loading}
-                  className="flex-1 border-none bg-transparent focus:outline-none focus:ring-0 text-slate-800 placeholder:text-slate-400 text-sm"
+                  className="w-full border-none bg-transparent focus:outline-none focus:ring-0 text-slate-800 placeholder:text-slate-400 text-sm"
                 />
               </div>
             </div>
@@ -128,8 +173,7 @@ const LoginMobile = ({ setRole, setPage, setUser }: LoginMobileProps) => {
                   Forgot?
                 </button>
               </div>
-              <div className={`flex items-center gap-2.5 bg-slate-50 border ${error ? 'border-red-300' : 'border-slate-200'} rounded-xl h-11 px-3.5 relative`}>
-                <Lock className={`w-4 h-4 ${error ? 'text-red-400' : 'text-slate-400'} shrink-0`} />
+              <div className={`bg-slate-50 border ${error ? 'border-red-300' : 'border-slate-200'} rounded-xl h-11 px-3.5 flex items-center relative`}>
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
@@ -137,7 +181,7 @@ const LoginMobile = ({ setRole, setPage, setUser }: LoginMobileProps) => {
                   onKeyDown={handleKeyPress}
                   placeholder="Enter password"
                   disabled={loading}
-                  className="flex-1 border-none bg-transparent focus:outline-none focus:ring-0 text-slate-800 placeholder:text-slate-400 text-sm pr-6"
+                  className="w-full border-none bg-transparent focus:outline-none focus:ring-0 text-slate-800 placeholder:text-slate-400 text-sm pr-7"
                 />
                 <button
                   type="button"
@@ -155,7 +199,7 @@ const LoginMobile = ({ setRole, setPage, setUser }: LoginMobileProps) => {
             <button
               onClick={handleLogin}
               disabled={loading}
-              className="w-full h-11 rounded-xl bg-[#0F3F73] hover:bg-[#0B335E] text-white font-bold text-sm shadow-lg shadow-[#0F3F73]/30 mt-2 hover:shadow-xl active:scale-95 transition-all disabled:opacity-70 flex items-center justify-center"
+              className="w-full h-11 rounded-xl bg-[#0F3F73] hover:bg-[#0B335E] text-white font-bold text-sm shadow-md shadow-[#0F3F73]/30 mt-2 hover:shadow-lg active:scale-95 transition-all disabled:opacity-70 flex items-center justify-center"
             >
               {loading ? (
                 <div className="flex items-center gap-2">
@@ -172,10 +216,7 @@ const LoginMobile = ({ setRole, setPage, setUser }: LoginMobileProps) => {
 
       {/* FOOTER */}
       <div className="text-center text-slate-200 text-[11px] pb-3 shrink-0 px-4 space-y-0.5">
-        <div className="flex items-center justify-center gap-1 font-semibold text-amber-300">
-          <ShieldCheck className="w-3.5 h-3.5" />
-          <span>Karnataka e-Governance Verified</span>
-        </div>
+        <p className="font-semibold text-amber-300">Karnataka e-Governance Verified</p>
         <p className="opacity-80 text-[10px]">Department of Minority Welfare • Govt. of Karnataka</p>
       </div>
     </div>
