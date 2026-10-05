@@ -9,16 +9,18 @@ export default async function handler(req, res) {
     pathStr = req.url.slice('/api/'.length).split('?')[0];
   }
 
-  // Preserve trailing slash if present in query or original URL
-  const originalPath = req.url.split('?')[0];
-  if (originalPath.endsWith('/') && !pathStr.endsWith('/') && pathStr.length > 0) {
-    pathStr += '/';
-  }
+  // Strip leading /api/ or / if present
+  pathStr = pathStr.replace(/^\/?(api\/)?/, '');
 
-  // Preserve query parameters (excluding the internal 'path' rewrite param)
+  // Extract query parameters from URL (excluding the 'path' parameter used by proxy)
   const urlObj = new URL(req.url, 'http://localhost');
   urlObj.searchParams.delete('path');
   const queryString = urlObj.search ? urlObj.search : '';
+
+  // Preserve trailing slash before query string if subpath does not have it and has segments
+  if (!pathStr.endsWith('/') && !pathStr.includes('.')) {
+    pathStr += '/';
+  }
 
   const targetUrl = `http://168.144.124.158/api/${pathStr}${queryString}`;
 
