@@ -1,18 +1,32 @@
 export default async function handler(req, res) {
-  // Extract path parameters from catch-all route
-  const { path } = req.query;
-  const pathStr = Array.isArray(path) ? path.join('/') : (path || '');
+  // 1. Determine the path to forward
+  let pathStr = '';
   
-  // Extract original query parameters
-  const queryIndex = req.url.indexOf('?');
-  const queryString = queryIndex !== -1 ? req.url.slice(queryIndex) : '';
-  
+  if (req.query && req.query.path) {
+    const rawPath = req.query.path;
+    pathStr = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
+  } else if (req.url && req.url.startsWith('/api/')) {
+    pathStr = req.url.slice('/api/'.length).split('?')[0];
+  }
+
+  // Preserve trailing slash if present in query or original URL
+  const originalPath = req.url.split('?')[0];
+  if (originalPath.endsWith('/') && !pathStr.endsWith('/') && pathStr.length > 0) {
+    pathStr += '/';
+  }
+
+  // Preserve query parameters (excluding the internal 'path' rewrite param)
+  const urlObj = new URL(req.url, 'http://localhost');
+  urlObj.searchParams.delete('path');
+  const queryString = urlObj.search ? urlObj.search : '';
+
   const targetUrl = `http://168.144.124.158/api/${pathStr}${queryString}`;
 
   const headers = {};
   for (const [key, value] of Object.entries(req.headers)) {
-    if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
-      headers[key] = value;
+    const lower = key.toLowerCase();
+    if (!['host', 'connection', 'content-length'].includes(lower)) {
+      headers[lower] = value;
     }
   }
 
