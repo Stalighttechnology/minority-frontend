@@ -56,46 +56,55 @@ button.bg-\[\#0F3F73\]:hover svg,
     --safe-area-inset-bottom: 0px;
     --safe-area-inset-left: 0px;
     --safe-area-inset-right: 0px;
-    --background: 210 20% 98%;
-    --foreground: 215 28% 17%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 215 28% 17%;
+    /* ── Official Karnataka Government Portal Theme (Warm Ivory / Cream Global) ── */
+    /* Warm Ivory Canvas (#FDFBF7 / #FAF8F4) */
+    --background: 40 45% 97.5%;
+    /* High-Authority Typography (#0B1E38 - Deep Secretariat Slate/Navy) */
+    --foreground: 217 67% 13%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 28% 17%;
+    /* Warm Ivory Cards & Popovers (#FDFBF7) */
+    --card: 40 45% 98.2%;
+    --card-foreground: 217 67% 13%;
 
-    /* Official Karnataka Government Secretariat Navy Blue */
-    --primary: 213 80% 28%;
+    --popover: 40 45% 98.2%;
+    --popover-foreground: 217 67% 13%;
+
+    /* Official Karnataka Government Secretariat Deep Navy Blue (#0F3F73) */
+    --primary: 213 77% 26%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 214 32% 93%;
-    --secondary-foreground: 213 80% 28%;
+    /* Warm Secondary & Muted Surfaces (#F4EFEA) */
+    --secondary: 40 25% 94%;
+    --secondary-foreground: 213 77% 26%;
 
-    --muted: 214 32% 93%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 40 22% 93%;
+    --muted-foreground: 215 19% 38%;
 
-    /* Karnataka State Emblem Gold / Saffron Accent */
-    --accent: 38 92% 50%;
-    --accent-foreground: 213 80% 28%;
+    /* Karnataka State Emblem Gold / Saffron Accent (#D97706 / #F59E0B) */
+    --accent: 38 92% 48%;
+    --accent-foreground: 213 77% 26%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Karnataka Flag Crimson / Alert (#C8102E / #DC2626) */
+    --destructive: 351 82% 44%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 88%;
-    --input: 214 32% 88%;
-    --ring: 213 80% 28%;
+    /* Refined Warm Institutional Borders & Inputs (#E5DFD7) */
+    --border: 38 20% 87%;
+    --input: 38 20% 87%;
+    --ring: 213 77% 26%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 28% 17%;
-    --sidebar-primary: 213 80% 28%;
+    /* Official Secretariat Sidebar Theme (Warm Ivory / Cream) */
+    --sidebar-background: 40 45% 97.5%;
+    --sidebar-foreground: 217 67% 13%;
+    --sidebar-primary: 213 77% 26%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 214 32% 95%;
-    --sidebar-accent-foreground: 213 80% 28%;
-    --sidebar-border: 214 32% 90%;
-    --sidebar-ring: 213 80% 28%;
+    --sidebar-accent: 40 25% 94%;
+    --sidebar-accent-foreground: 213 77% 26%;
+    --sidebar-border: 38 20% 88%;
+    --sidebar-ring: 213 77% 26%;
   }
 
   .dark {
@@ -145,6 +154,24 @@ button.bg-\[\#0F3F73\]:hover svg,
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ── Global Popups, Modals, Dialogs, Selects & Dropdowns ──────────────────── */
+[role="dialog"],
+[role="alertdialog"],
+[data-radix-popper-content-wrapper] > div,
+.bg-popover,
+.bg-card {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Ensure modal overlays, popovers and dialog children respect the warm theme */
+div[role="dialog"] .bg-white,
+div[role="alertdialog"] .bg-white,
+div[data-radix-popper-content-wrapper] .bg-white {
+  background-color: hsl(var(--card)) !important;
 }
 
 /* in your global CSS file, e.g., index.css */

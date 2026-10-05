@@ -233,10 +233,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   return (
     <motion.div
-      className={`flex flex-col h-screen h-[100dvh] overflow-hidden ${theme === "dark" ?
-        "dark bg-background text-foreground" :
-        "bg-gray-50 text-gray-900"}`
-      }
+      className="flex flex-col h-screen h-[100dvh] overflow-hidden bg-background text-foreground"
       initial={isNoAnimation ? false : { opacity: 0 }}
       animate={isNoAnimation ? false : { opacity: 1 }}
       transition={{ duration: 0.5 }}>
@@ -276,8 +273,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           <motion.main
             ref={mainContentRef}
-            className={`flex-1 min-h-0 min-w-0 p-4 pb-6 md:pb-8 overflow-y-auto overflow-x-hidden thin-scrollbar ${theme === "dark" ? "bg-background" : "bg-gray-50"}`
-            }
+            className="flex-1 min-h-0 min-w-0 p-4 pb-6 md:pb-8 overflow-y-auto overflow-x-hidden thin-scrollbar bg-background text-foreground"
             initial={isNoAnimation ? false : { opacity: 0, y: 20 }}
             animate={isNoAnimation ? false : { opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}>

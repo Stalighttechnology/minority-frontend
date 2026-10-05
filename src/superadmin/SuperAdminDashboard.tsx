@@ -137,7 +137,7 @@ const SuperAdminDashboard = ({ setIsAuthenticated }: Props) => {
           </div>
         </header>
 
-        <div className={`flex-1 overflow-y-auto p-4 pb-6 md:pb-8 thin-scrollbar ${theme === "dark" ? "bg-background" : "bg-gray-50"}`}>
+        <div className="flex-1 overflow-y-auto p-4 pb-6 md:pb-8 thin-scrollbar bg-background text-foreground">
           <motion.div
             key={activePage}
             initial={{ opacity: 0, y: 10 }}

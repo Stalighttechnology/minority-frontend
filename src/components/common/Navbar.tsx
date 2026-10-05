@@ -349,11 +349,7 @@ export const Navbar = ({
 
   return (
     <nav
-      className={`w-full flex items-center justify-between px-3 sm:px-6 h-[60px] border-b transition-colors duration-200 notranslate ${
-        theme === "dark"
-          ? "bg-card border-border text-foreground"
-          : "bg-white border-slate-200 text-slate-800 shadow-sm"
-      }`}
+      className="w-full flex items-center justify-between px-3 sm:px-6 h-[60px] border-b transition-colors duration-200 notranslate bg-card border-border text-foreground shadow-sm"
     >
       {/* Left: Hamburger + User Welcome & Portal Badge */}
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -428,11 +424,7 @@ export const Navbar = ({
             <div className="hidden sm:block relative" ref={desktopSwitcherRef}>
               <button
                 onClick={() => setShowDesktopSwitcher(!showDesktopSwitcher)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold ${
-                  theme === "dark"
-                    ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                }`}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-card border-border text-foreground hover:bg-muted/60"
               >
                 <span className="truncate max-w-[130px]">
                   {childrenList.find((c: any) => c.id.toString() === selectedChildId)?.name ||
@@ -442,13 +434,9 @@ export const Navbar = ({
 
               {showDesktopSwitcher && (
                 <div
-                  className={`absolute top-full right-0 mt-2 w-56 rounded-xl shadow-xl py-1 z-50 border ${
-                    theme === "dark"
-                      ? "bg-slate-800 border-slate-700"
-                      : "bg-white border-slate-200"
-                  }`}
+                  className="absolute top-full right-0 mt-2 w-56 rounded-xl shadow-xl py-1 z-50 border bg-card border-border text-foreground"
                 >
-                  <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase border-b">
+                  <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase border-b border-border">
                     Select Student
                   </div>
                   {childrenList.map((child: any) => (
@@ -478,11 +466,7 @@ export const Navbar = ({
             <div className="hidden sm:block relative" ref={orgSwitcherRef}>
               <button
                 onClick={() => setShowOrgSwitcher(!showOrgSwitcher)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold ${
-                  theme === "dark"
-                    ? "bg-slate-800 border-slate-700 text-slate-200"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                }`}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-card border-border text-foreground hover:bg-muted/60"
               >
                 <Building2 className="w-3.5 h-3.5 text-primary" />
                 <span className="truncate max-w-[140px]">
@@ -493,13 +477,9 @@ export const Navbar = ({
 
               {showOrgSwitcher && (
                 <div
-                  className={`absolute top-full right-0 mt-2 w-64 rounded-xl shadow-xl py-1 z-50 border ${
-                    theme === "dark"
-                      ? "bg-slate-800 border-slate-700"
-                      : "bg-white border-slate-200"
-                  }`}
+                  className="absolute top-full right-0 mt-2 w-64 rounded-xl shadow-xl py-1 z-50 border bg-card border-border text-foreground"
                 >
-                  <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase border-b">
+                  <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase border-b border-border">
                     Linked Schools / Institutions
                   </div>
                   {organizationsList.map((org: any) => (
