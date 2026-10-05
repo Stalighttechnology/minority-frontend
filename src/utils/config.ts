@@ -2,8 +2,12 @@
 const getApiBaseUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_BASE_URL || "";
   
-  // If it's a production URL (not localhost/127.0.0.1), use it directly
+  // If it's a production URL (not localhost/127.0.0.1), check for mixed content
   if (envUrl && !envUrl.includes("127.0.0.1") && !envUrl.includes("localhost")) {
+    // If the frontend is loaded over HTTPS but envUrl is HTTP, use relative proxy to avoid Mixed Content
+    if (typeof window !== "undefined" && window.location && window.location.protocol === "https:" && envUrl.startsWith("http://")) {
+      return "";
+    }
     return envUrl;
   }
   
@@ -11,18 +15,22 @@ const getApiBaseUrl = (): string => {
   // This ensures same-site cookie behavior whether accessing via localhost or 127.0.0.1.
   if (typeof window !== "undefined" && window.location) {
     const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
     
     // Only append :8000 and force http if we are on localhost/127.0.0.1/local IPs
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.")) {
       return `http://${hostname}:8000`;
     }
     
+    // On Vercel deployments, use relative path so Vercel rewrites proxy to backend without Mixed Content
+    if (hostname.endsWith("vercel.app")) {
+      return "";
+    }
+    
     // Default to the dedicated backend API server in production
     return "https://campusapi.stalight.in";
   }
   
-  return envUrl || "https://campusapi.stalight.in";
+  return envUrl || "";
 };
 
 const API_BASE_URL = getApiBaseUrl().replace(/\/+$/, '');

@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://campusapi.stalight.in/api/:path*"
+      "destination": "http://168.144.124.158/api/:path*"
     },
     {
       "source": "/(.*)",
