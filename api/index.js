@@ -1,10 +1,17 @@
 export const config = {
   api: {
-    bodyParser: {
-      sizeLimit: '25mb',
-    },
+    bodyParser: false,
+    responseLimit: '50mb',
   },
 };
+
+async function getRawBody(req) {
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks);
+}
 
 export default async function handler(req, res) {
   // Extract the path and query from req.url
@@ -28,7 +35,7 @@ export default async function handler(req, res) {
   const headers = {};
   for (const [key, value] of Object.entries(req.headers)) {
     const lower = key.toLowerCase();
-    if (!['host', 'connection', 'content-length'].includes(lower)) {
+    if (!['host', 'connection'].includes(lower)) {
       headers[lower] = value;
     }
   }
@@ -36,13 +43,9 @@ export default async function handler(req, res) {
   try {
     let body = undefined;
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-      if (typeof req.body === 'object' && req.body !== null) {
-        body = JSON.stringify(req.body);
-        if (!headers['content-type']) {
-          headers['content-type'] = 'application/json';
-        }
-      } else if (typeof req.body === 'string') {
-        body = req.body;
+      const rawBuffer = await getRawBody(req);
+      if (rawBuffer.length > 0) {
+        body = rawBuffer;
       }
     }
 
