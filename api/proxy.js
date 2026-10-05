@@ -1,6 +1,14 @@
 export default async function handler(req, res) {
-  // req.url contains the full path including /api/... and any query params
-  const targetUrl = `http://168.144.124.158${req.url}`;
+  // Extract path forwarded by Vercel rewrite
+  const { path: subpath } = req.query;
+  const pathStr = Array.isArray(subpath) ? subpath.join('/') : (subpath || '');
+
+  // Remove the 'path' param that Vercel rewrite injected, keep original query params
+  const urlObj = new URL(req.url, 'http://localhost');
+  urlObj.searchParams.delete('path');
+  const queryString = urlObj.search ? urlObj.search : '';
+
+  const targetUrl = `http://168.144.124.158/api/${pathStr}${queryString}`;
 
   const headers = {};
   for (const [key, value] of Object.entries(req.headers)) {
