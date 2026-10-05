@@ -7,35 +7,23 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  // 1. Determine the subpath after /api/
-  let pathStr = '';
+  // Extract the path and query from req.url
+  const rawUrl = req.url || '';
   
-  if (req.query && req.query.path) {
-    const rawPath = req.query.path;
-    pathStr = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
-  } else if (req.url) {
-    const cleanUrl = req.url.split('?')[0];
-    if (cleanUrl.startsWith('/api/')) {
-      pathStr = cleanUrl.slice('/api/'.length);
-    } else if (cleanUrl.startsWith('/api')) {
-      pathStr = cleanUrl.slice('/api'.length);
-    }
-  }
-
-  // Strip leading slash
-  pathStr = pathStr.replace(/^\/+/, '');
+  // Remove leading /api or /api/
+  let subPath = rawUrl.replace(/^\/?api\/?/, '');
+  
+  // Separate subPath into pathname and search params
+  const [pathname, search] = subPath.split('?');
+  let cleanPath = pathname || '';
 
   // Django backend requires trailing slashes for standard REST routes
-  if (pathStr && !pathStr.endsWith('/') && !pathStr.includes('.')) {
-    pathStr += '/';
+  if (cleanPath && !cleanPath.endsWith('/') && !cleanPath.includes('.')) {
+    cleanPath += '/';
   }
 
-  // Preserve query parameters (excluding the internal Vercel 'path' param)
-  const urlObj = new URL(req.url, 'http://localhost');
-  urlObj.searchParams.delete('path');
-  const queryString = urlObj.search ? urlObj.search : '';
-
-  const targetUrl = `http://168.144.124.158/api/${pathStr}${queryString}`;
+  const queryString = search ? `?${search}` : '';
+  const targetUrl = `http://168.144.124.158/api/${cleanPath}${queryString}`;
 
   const headers = {};
   for (const [key, value] of Object.entries(req.headers)) {
