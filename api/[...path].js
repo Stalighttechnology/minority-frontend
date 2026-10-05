@@ -1,21 +1,36 @@
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '25mb',
+    },
+  },
+};
+
 export default async function handler(req, res) {
-  // 1. Determine the path to forward
+  // 1. Determine the subpath after /api/
   let pathStr = '';
   
   if (req.query && req.query.path) {
     const rawPath = req.query.path;
     pathStr = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
-  } else if (req.url && req.url.startsWith('/api/')) {
-    pathStr = req.url.slice('/api/'.length).split('?')[0];
+  } else if (req.url) {
+    const cleanUrl = req.url.split('?')[0];
+    if (cleanUrl.startsWith('/api/')) {
+      pathStr = cleanUrl.slice('/api/'.length);
+    } else if (cleanUrl.startsWith('/api')) {
+      pathStr = cleanUrl.slice('/api'.length);
+    }
   }
 
-  // Preserve trailing slash if present in query or original URL
-  const originalPath = req.url.split('?')[0];
-  if (originalPath.endsWith('/') && !pathStr.endsWith('/') && pathStr.length > 0) {
+  // Strip leading slash
+  pathStr = pathStr.replace(/^\/+/, '');
+
+  // Django backend requires trailing slashes for standard REST routes
+  if (pathStr && !pathStr.endsWith('/') && !pathStr.includes('.')) {
     pathStr += '/';
   }
 
-  // Preserve query parameters (excluding the internal 'path' rewrite param)
+  // Preserve query parameters (excluding the internal Vercel 'path' param)
   const urlObj = new URL(req.url, 'http://localhost');
   urlObj.searchParams.delete('path');
   const queryString = urlObj.search ? urlObj.search : '';

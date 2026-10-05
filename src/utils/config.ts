@@ -2,17 +2,11 @@
 const getApiBaseUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_BASE_URL || "";
   
-  // If it's a production URL (not localhost/127.0.0.1), check for mixed content
   if (envUrl && !envUrl.includes("127.0.0.1") && !envUrl.includes("localhost")) {
-    // If the frontend is loaded over HTTPS but envUrl is HTTP, use Vercel proxy to avoid Mixed Content
-    if (typeof window !== "undefined" && window.location && window.location.protocol === "https:" && envUrl.startsWith("http://")) {
-      return "/api/proxy?path=";
-    }
     return envUrl;
   }
   
   // For local development, dynamically match the frontend's current hostname.
-  // This ensures same-site cookie behavior whether accessing via localhost or 127.0.0.1.
   if (typeof window !== "undefined" && window.location) {
     const hostname = window.location.hostname;
     
@@ -21,9 +15,9 @@ const getApiBaseUrl = (): string => {
       return `http://${hostname}:8000`;
     }
     
-    // On Vercel deployments, use serverless proxy to forward to backend
+    // On Vercel deployments, relative /api paths are routed through Vercel serverless proxy
     if (hostname.endsWith("vercel.app")) {
-      return "/api/proxy?path=";
+      return "";
     }
     
     // Default to the dedicated backend API server in production
@@ -34,9 +28,8 @@ const getApiBaseUrl = (): string => {
 };
 
 const rawBaseUrl = getApiBaseUrl();
-const isProxy = rawBaseUrl.includes('/api/proxy?path=');
-const API_BASE_URL = isProxy ? '/api/proxy?path=' : rawBaseUrl.replace(/\/+$/, '');
-const API_ENDPOINT = isProxy ? '/api/proxy?path=' : `${API_BASE_URL}/api`;
+const API_BASE_URL = rawBaseUrl ? rawBaseUrl.replace(/\/+$/, '') : '';
+const API_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api` : '/api';
 
 const TOKEN_REFRESH_TIMEOUT = 10000; // 10 seconds timeout for token refresh requests
 
