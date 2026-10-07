@@ -34,7 +34,10 @@ import {
   Loader2,
   CreditCard,
   FileCheck,
-  FileText
+  FileText,
+  School,
+  Search,
+  Plus
 } from
   "lucide-react";
 import {
@@ -45,6 +48,7 @@ import {
   SkeletonTable
 } from
   "../ui/skeleton";
+import { AddSchoolSearchModal } from "../org_admin/AddSchoolSearchModal";
 
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
@@ -58,6 +62,7 @@ const AdminStats = ({ setError, onNavigate }: AdminStatsProps) => {
   const [search, setSearch] = useState("");
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showSchoolSearchModal, setShowSchoolSearchModal] = useState(false);
   const { toast } = useToast();
   const { theme } = useTheme();
 
@@ -307,6 +312,48 @@ const AdminStats = ({ setError, onNavigate }: AdminStatsProps) => {
   return (
     <div className={`space-y-8 ${theme === 'dark' ? 'bg-background text-foreground' : 'bg-gray-50 text-gray-900'}`}>
       <div>
+        {/* Org Admin Quick School Switcher & Search Banner */}
+        {user?.role === "org_admin" && (
+          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-primary/15 via-primary/5 to-transparent border border-primary/20 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center shrink-0 shadow-sm">
+                <School className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold text-foreground">
+                    {stats?.organization_name || user?.org_name || "Institution Dashboard"}
+                  </h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/20 text-primary uppercase tracking-wide">
+                    Live View
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Filter and switch across District, Taluk, and Village registered schools.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setShowSchoolSearchModal(true)}
+                className="flex items-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all"
+              >
+                <Search className="w-3.5 h-3.5" />
+                Find / Switch School
+              </button>
+              {onNavigate && (
+                <button
+                  onClick={() => onNavigate("create-organization")}
+                  className="flex items-center gap-1.5 text-xs font-medium px-3.5 py-2.5 rounded-xl border border-border bg-card hover:bg-muted/60 text-foreground transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add School
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Dashboard Cards */}
         <div id="admin-stats-grid" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -379,7 +426,7 @@ const AdminStats = ({ setError, onNavigate }: AdminStatsProps) => {
             <FiSearch className={theme === 'dark' ? "text-foreground mr-3" : "text-gray-500 mr-3"} />
             <input
               type="text"
-              placeholder="Search by branch name"
+              placeholder={user?.role === "org_admin" ? "Search branches, or click Find Schools to search registered institutions" : "Search by branch name"}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={`w-full outline-none text-sm bg-transparent ${theme === 'dark' ? 'text-foreground placeholder:text-muted-foreground' : 'text-gray-900 placeholder:text-gray-500'}`} />
@@ -392,6 +439,18 @@ const AdminStats = ({ setError, onNavigate }: AdminStatsProps) => {
               </button>
             )}
           </div>
+
+          {/* Org Admin Search Registered Schools Button */}
+          {user?.role === "org_admin" && (
+            <button
+              onClick={() => setShowSchoolSearchModal(true)}
+              className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-lg border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition duration-200 shadow-sm whitespace-nowrap"
+            >
+              <School className="w-4 h-4" />
+              <span className="hidden sm:inline">Search Registered Schools</span>
+              <span className="sm:hidden">Schools</span>
+            </button>
+          )}
 
           {/* Desktop Export PDF Button */}
           <button
@@ -681,6 +740,22 @@ const AdminStats = ({ setError, onNavigate }: AdminStatsProps) => {
           onClick={() => handleCardClick("compliance-reports")} />
 
       </div>
+
+      {/* Add / Search School Modal for Org Admin */}
+      {user?.role === "org_admin" && (
+        <AddSchoolSearchModal
+          isOpen={showSchoolSearchModal}
+          onClose={() => setShowSchoolSearchModal(false)}
+          onSelectOrg={() => {
+            setShowSchoolSearchModal(false);
+          }}
+          onNavigateCreateOrg={() => {
+            if (onNavigate) {
+              onNavigate("create-organization");
+            }
+          }}
+        />
+      )}
     </div>);
 
 };

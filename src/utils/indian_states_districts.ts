@@ -107,6 +107,16 @@ export const getTaluksForDistrict = (district: string): string[] => {
 };
 
 export const TALUK_VILLAGES: Record<string, string[]> = {
+  "Bagalkot": ["Bagalkot Town", "Navanagar", "Vidyagiri", "Muchakhandi", "Kalliguddi", "Sirur", "Gaddankeri", "Sector 1", "Sector 25", "Simikeri", "Shirol", "Bevoor"],
+  "Badami": ["Badami Town", "Guledgudda", "Pattadakal", "Aihole", "Kerur", "Belur", "Kendur", "Cholachagudda", "Katageri"],
+  "Bilagi": ["Bilagi Town", "Galagali", "Kundaragi", "Siddapur", "Anagawadi", "Tolakatti", "Katarki"],
+  "Hungund": ["Hungund Town", "Ilkal", "Amingad", "Kudalasangama", "Karadi", "Ramawadagi", "Gudagunti"],
+  "Jamkhandi": ["Jamkhandi Town", "Rabkavi", "Banhatti", "Terdal", "Savalagi", "Kankanawadi", "Hirepadasalagi", "Hunnur"],
+  "Mudhol": ["Mudhol Town", "Lokapur", "Mahalingpur", "Uttur", "Ranna Belagali", "Mantur", "Belagali"],
+  "Guledgudda": ["Guledgudda Town", "Kotikal", "Asangi", "Layadagundi", "Hangargi"],
+  "Rabkavi Banhatti": ["Rabkavi Town", "Banhatti Town", "Rampur", "Hosur", "Tamadaddi"],
+  "Ilkal": ["Ilkal Town", "Balkundi", "Chittawadagi", "Gorabal", "Gudur"],
+
   "Bengaluru North": ["Peenya", "Yeshwanthpur", "Jalahalli", "Hebbal", "Malleshwaram", "Mathikere", "Vidyaranyapura", "HMT Colony", "Chikkabanavara", "Dasarahalli", "T. Dasarahalli", "Hesaraghatta"],
   "Bengaluru South": ["Jayanagar", "JP Nagar", "Banashankari", "Basavanagudi", "Padmanabhanagar", "Uttarahalli", "Kengeri", "Konanakunte", "Giri Nagar", "Kumaraswamy Layout", "Anjanapura", "Begur"],
   "Bengaluru East": ["Indiranagar", "K.R. Puram", "Whitefield", "Marathahalli", "Mahadevapura", "HAL", "Varthur", "Hoodi", "Bellandur", "CV Raman Nagar", "Ramamurthy Nagar", "Kadugodi"],
@@ -126,6 +136,15 @@ export const TALUK_VILLAGES: Record<string, string[]> = {
   "Udupi": ["Manipal", "Santhekatte", "Malpe", "Kadiyali", "Ambalpady", "Brahmagiri", "Indrali", "Bannanje", "Parkala"]
 };
 
+export const INSTITUTION_MANAGEMENT_TYPES = [
+  "State Gov",
+  "Central Gov",
+  "Private Aided",
+  "Private Unaided",
+  "Autonomous",
+  "University"
+];
+
 export const getVillagesForTaluk = (taluk: string): string[] => {
   if (TALUK_VILLAGES[taluk]) {
     return TALUK_VILLAGES[taluk];
@@ -139,4 +158,5 @@ export const getVillagesForTaluk = (taluk: string): string[] => {
   }
   return [];
 };
+
 

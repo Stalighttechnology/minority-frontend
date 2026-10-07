@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { FiBell, FiMoon, FiSun, FiMenu, FiBellOff, FiClock, FiCalendar } from "react-icons/fi";
-import { Building2, Plus, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Building2, Plus, ShieldCheck, User as UserIcon, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { useTheme } from "../../context/ThemeContext";
@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger, PopoverArrow } from "../ui/pop
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { translateTerminology } from "../../utils/institutionConfig";
 import { AddCollegeModal } from "../org_admin/AddCollegeModal";
+import { AddSchoolSearchModal } from "../org_admin/AddSchoolSearchModal";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
 interface User {
@@ -461,42 +462,70 @@ export const Navbar = ({
             </div>
           )}
 
-          {/* Org Admin Switcher */}
+          {/* Org Admin Switcher - Responsive on Mobile, Tablet & Desktop */}
           {role === "org_admin" && (
-            <div className="hidden sm:block relative" ref={orgSwitcherRef}>
-              <button
-                onClick={() => setShowOrgSwitcher(!showOrgSwitcher)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-card border-border text-foreground hover:bg-muted/60"
-              >
-                <Building2 className="w-3.5 h-3.5 text-primary" />
-                <span className="truncate max-w-[140px]">
-                  {organizationsList.find((o: any) => o.id.toString() === selectedOrgId)?.name ||
-                    "Select School"}
-                </span>
-              </button>
+            <div className="relative flex items-center" ref={orgSwitcherRef}>
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <button
+                  onClick={() => setShowOrgSwitcher(!showOrgSwitcher)}
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-semibold bg-card border-border text-foreground hover:bg-muted/60 transition-colors"
+                >
+                  <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="truncate max-w-[90px] sm:max-w-[140px] md:max-w-[180px]">
+                    {organizationsList.find((o: any) => o.id.toString() === selectedOrgId)?.name ||
+                      "Select School"}
+                  </span>
+                </button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowAddCollegeModal(true)}
+                  title="Search & Filter Registered Schools (Bagalkot, Karnataka, etc.)"
+                  className="h-8 w-8 rounded-lg border text-primary hover:bg-primary/10 transition-colors shrink-0"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </Button>
+              </div>
 
               {showOrgSwitcher && (
                 <div
-                  className="absolute top-full right-0 mt-2 w-64 rounded-xl shadow-xl py-1 z-50 border bg-card border-border text-foreground"
+                  className="absolute top-full right-0 mt-2 w-64 sm:w-72 rounded-xl shadow-xl py-1 z-50 border bg-card border-border text-foreground max-w-[90vw]"
                 >
-                  <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase border-b border-border">
-                    Linked Schools / Institutions
+                  <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase border-b border-border flex items-center justify-between">
+                    <span>Linked Schools</span>
+                    <span className="text-primary font-semibold">{organizationsList.length}</span>
                   </div>
-                  {organizationsList.map((org: any) => (
+                  <div className="max-h-56 overflow-y-auto">
+                    {organizationsList.map((org: any) => (
+                      <button
+                        key={org.id}
+                        onClick={() => {
+                          sessionStorage.setItem("selectedOrgId", org.id.toString());
+                          setSelectedOrgId(org.id.toString());
+                          setShowOrgSwitcher(false);
+                          window.location.reload();
+                        }}
+                        className={`block w-full text-left px-3 py-2 text-xs transition-colors ${
+                          selectedOrgId === org.id.toString()
+                            ? "bg-primary/10 text-primary font-bold"
+                            : "hover:bg-primary/5 text-foreground"
+                        }`}
+                      >
+                        <div className="font-semibold truncate">{org.name}</div>
+                        <div className="text-[10px] text-muted-foreground truncate">{org.address || "Karnataka"}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="p-1.5 border-t space-y-1">
                     <button
-                      key={org.id}
                       onClick={() => {
-                        sessionStorage.setItem("selectedOrgId", org.id.toString());
-                        setSelectedOrgId(org.id.toString());
                         setShowOrgSwitcher(false);
-                        window.location.reload();
+                        setShowAddCollegeModal(true);
                       }}
-                      className="block w-full text-left px-3 py-2 text-xs hover:bg-primary/10 transition-colors"
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg transition-colors"
                     >
-                      <div className="font-semibold">{org.name}</div>
+                      <Search className="w-3.5 h-3.5" /> Search & Filter Schools
                     </button>
-                  ))}
-                  <div className="p-1 border-t">
                     <button
                       onClick={() => {
                         setShowOrgSwitcher(false);
@@ -505,9 +534,9 @@ export const Navbar = ({
                         }
                         navigate("/org-admin/create-organization");
                       }}
-                      className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
                     >
-                      <Plus className="w-3.5 h-3.5" /> Add School / Institution
+                      <Plus className="w-3.5 h-3.5" /> Register New School
                     </button>
                   </div>
                 </div>
@@ -602,17 +631,20 @@ export const Navbar = ({
           </button>
         </div>
 
-      {/* Add College Modal for Org Admin */}
-      <AddCollegeModal
+      {/* Search & Add School Modal for Org Admin */}
+      <AddSchoolSearchModal
         isOpen={showAddCollegeModal}
         onClose={() => setShowAddCollegeModal(false)}
-        onSuccess={(newOrg) => {
+        onSelectOrg={(newOrg) => {
           fetchOrganizations();
           if (newOrg?.id) {
             sessionStorage.setItem("selectedOrgId", newOrg.id.toString());
             setSelectedOrgId(newOrg.id.toString());
-            window.location.reload();
           }
+        }}
+        onNavigateCreateOrg={() => {
+          if (setPage) setPage("create-organization");
+          navigate("/org-admin/create-organization");
         }}
       />
     </nav>
