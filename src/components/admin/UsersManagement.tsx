@@ -406,7 +406,8 @@ const UsersManagement = ({ setError, toast }: UsersManagementProps) => {
             designation: user.designation || "",
             status: user.is_active ? "Active" : "Inactive",
             username: user.username || "",
-            department: user.department || "N/A",
+            department: user.department !== "N/A" ? user.department : (user.organization_name || "N/A"),
+            organization_name: user.organization_name || "",
             extra: user.extra || {},
             mobile: user.mobile_number || "",
           })) : [];
@@ -974,8 +975,8 @@ const UsersManagement = ({ setError, toast }: UsersManagementProps) => {
                         )}
                         <th className="py-2 px-1 md:w-[120px]">Role</th>
                         <th className="py-2 px-1 md:w-[140px]">Designation</th>
-                        {(roleFilter === "" || rolesNeedingDept.includes(roleFilter)) && (
-                          <th className="py-2 px-1 md:w-[250px]">Department</th>
+                        {(roleFilter === "" || rolesNeedingDept.includes(roleFilter) || roleFilter === "Principal") && (
+                          <th className="py-2 px-1 md:w-[250px]">{roleFilter === "Principal" ? "Institution" : "Department"}</th>
                         )}
                         <th className="py-2 px-1 md:w-[140px]">Mobile</th>
                         <th className="py-2 px-1 md:w-[120px]">Status</th>
@@ -1012,10 +1013,10 @@ const UsersManagement = ({ setError, toast }: UsersManagementProps) => {
                               <span className="text-muted-foreground">—</span>
                             )}
                           </td>
-                          {(roleFilter === "" || rolesNeedingDept.includes(roleFilter)) && (
+                          {(roleFilter === "" || rolesNeedingDept.includes(roleFilter) || roleFilter === "Principal") && (
                             <td className="table-cell py-2 px-1 whitespace-nowrap md:w-[250px]">
                               <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                                {user.department !== "N/A" ? user.department : "-"}
+                                {user.department !== "N/A" ? user.department : (user.organization_name || "-")}
                               </span>
                             </td>
                           )}
