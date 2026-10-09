@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
 import { FiBell, FiMoon, FiSun, FiMenu, FiBellOff, FiClock, FiCalendar } from "react-icons/fi";
-import { Building2, Plus, ShieldCheck, User as UserIcon, Search } from "lucide-react";
+import { Building2, Plus, ShieldCheck, User as UserIcon, Search, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import { Button } from "../ui/button";
 import { API_BASE_URL } from "../../utils/config";
@@ -124,7 +124,31 @@ export const Navbar = ({
   );
   const [showOrgSwitcher, setShowOrgSwitcher] = useState(false);
   const [showAddCollegeModal, setShowAddCollegeModal] = useState(false);
+  const [orgSearchQuery, setOrgSearchQuery] = useState("");
+  const [orgCurrentPage, setOrgCurrentPage] = useState(1);
   const orgSwitcherRef = useRef<HTMLDivElement>(null);
+
+  const filteredOrgs = useMemo(() => {
+    if (!orgSearchQuery.trim()) return organizationsList;
+    const q = orgSearchQuery.toLowerCase().trim();
+    return organizationsList.filter((org: any) =>
+      (org.name && org.name.toLowerCase().includes(q)) ||
+      (org.address && org.address.toLowerCase().includes(q))
+    );
+  }, [organizationsList, orgSearchQuery]);
+
+  const ORG_PAGE_SIZE = 10;
+  const totalOrgPages = Math.max(1, Math.ceil(filteredOrgs.length / ORG_PAGE_SIZE));
+  const currentPageSafe = Math.min(Math.max(1, orgCurrentPage), totalOrgPages);
+
+  const paginatedOrgs = useMemo(() => {
+    const start = (currentPageSafe - 1) * ORG_PAGE_SIZE;
+    return filteredOrgs.slice(start, start + ORG_PAGE_SIZE);
+  }, [filteredOrgs, currentPageSafe]);
+
+  useEffect(() => {
+    setOrgCurrentPage(1);
+  }, [orgSearchQuery]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -489,42 +513,136 @@ export const Navbar = ({
 
               {showOrgSwitcher && (
                 <div
-                  className="absolute top-full right-0 mt-2 w-64 sm:w-72 rounded-xl shadow-xl py-1 z-50 border bg-card border-border text-foreground max-w-[90vw]"
+                  className="absolute top-full right-0 mt-2 w-80 sm:w-96 rounded-2xl shadow-2xl z-50 border bg-card border-border text-foreground max-w-[95vw] overflow-hidden"
                 >
-                  <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase border-b border-border flex items-center justify-between">
-                    <span>Linked Schools</span>
-                    <span className="text-primary font-semibold">{organizationsList.length}</span>
+                  {/* Header */}
+                  <div className="px-3.5 py-2.5 bg-muted/40 border-b border-border flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-foreground">Linked Schools / Institutions</div>
+                      <div className="text-[10px] text-muted-foreground">Switch dashboard view across registered schools</div>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20 shrink-0">
+                      {filteredOrgs.length} {filteredOrgs.length === 1 ? 'School' : 'Schools'}
+                    </span>
                   </div>
-                  <div className="max-h-56 overflow-y-auto">
-                    {organizationsList.map((org: any) => (
+
+                  {/* Search Bar */}
+                  <div className="p-2 border-b border-border/60 bg-background/50">
+                    <div className="relative flex items-center">
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 text-muted-foreground pointer-events-none" />
+                      <input
+                        type="text"
+                        value={orgSearchQuery}
+                        onChange={(e) => setOrgSearchQuery(e.target.value)}
+                        placeholder="Search by school name, code, district..."
+                        className="w-full text-xs pl-8 pr-7 py-1.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        autoFocus
+                      />
+                      {orgSearchQuery && (
+                        <button
+                          onClick={() => setOrgSearchQuery("")}
+                          className="absolute right-2 p-0.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                          title="Clear search"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 10 Items per page List */}
+                  <div className="max-h-72 overflow-y-auto divide-y divide-border/40">
+                    {paginatedOrgs.length === 0 ? (
+                      <div className="py-8 px-4 text-center text-muted-foreground">
+                        <Building2 className="w-7 h-7 mx-auto mb-1.5 opacity-40 text-primary" />
+                        <p className="text-xs font-medium text-foreground">No schools found</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Try searching with a different keyword</p>
+                      </div>
+                    ) : (
+                      paginatedOrgs.map((org: any, idx: number) => {
+                        const isSelected = selectedOrgId === org.id.toString();
+                        const itemNumber = (currentPageSafe - 1) * ORG_PAGE_SIZE + idx + 1;
+                        return (
+                          <button
+                            key={org.id}
+                            onClick={() => {
+                              sessionStorage.setItem("selectedOrgId", org.id.toString());
+                              setSelectedOrgId(org.id.toString());
+                              setShowOrgSwitcher(false);
+                              window.location.reload();
+                            }}
+                            className={`w-full text-left px-3.5 py-2 text-xs transition-colors flex items-start gap-2.5 ${
+                              isSelected
+                                ? "bg-primary/10 text-primary font-bold"
+                                : "hover:bg-primary/5 text-foreground"
+                            }`}
+                          >
+                            <span className="text-[10px] font-bold text-muted-foreground w-5 shrink-0 pt-0.5">
+                              {itemNumber}.
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <div className="font-semibold text-xs truncate text-foreground">{org.name}</div>
+                                {org.is_primary && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
+                                    Primary
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground truncate mt-0.5">
+                                {org.address || "Karnataka"}
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <span className="text-[10px] font-bold text-primary shrink-0 self-center">
+                                Active ✓
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Pagination Controls (10 per page) */}
+                  {totalOrgPages > 1 && (
+                    <div className="px-3 py-2 bg-muted/30 border-t border-border flex items-center justify-between text-xs">
                       <button
-                        key={org.id}
-                        onClick={() => {
-                          sessionStorage.setItem("selectedOrgId", org.id.toString());
-                          setSelectedOrgId(org.id.toString());
-                          setShowOrgSwitcher(false);
-                          window.location.reload();
-                        }}
-                        className={`block w-full text-left px-3 py-2 text-xs transition-colors ${
-                          selectedOrgId === org.id.toString()
-                            ? "bg-primary/10 text-primary font-bold"
-                            : "hover:bg-primary/5 text-foreground"
-                        }`}
+                        type="button"
+                        disabled={currentPageSafe <= 1}
+                        onClick={() => setOrgCurrentPage((p) => Math.max(1, p - 1))}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-md border border-border bg-card hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-all font-medium text-[11px]"
                       >
-                        <div className="font-semibold truncate">{org.name}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">{org.address || "Karnataka"}</div>
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                        <span>Prev</span>
                       </button>
-                    ))}
-                  </div>
-                  <div className="p-1.5 border-t space-y-1">
+
+                      <span className="text-[11px] font-semibold text-muted-foreground">
+                        Page <strong className="text-foreground">{currentPageSafe}</strong> of <strong className="text-foreground">{totalOrgPages}</strong>
+                      </span>
+
+                      <button
+                        type="button"
+                        disabled={currentPageSafe >= totalOrgPages}
+                        onClick={() => setOrgCurrentPage((p) => Math.min(totalOrgPages, p + 1))}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-md border border-border bg-card hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-all font-medium text-[11px]"
+                      >
+                        <span>Next</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Actions Footer */}
+                  <div className="p-2 border-t border-border bg-card space-y-1">
                     <button
                       onClick={() => {
                         setShowOrgSwitcher(false);
                         setShowAddCollegeModal(true);
                       }}
-                      className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg transition-colors border border-primary/20"
                     >
-                      <Search className="w-3.5 h-3.5" /> Search & Filter Schools
+                      <Search className="w-3.5 h-3.5" /> Search &amp; Filter Schools (District / Taluk)
                     </button>
                     <button
                       onClick={() => {
