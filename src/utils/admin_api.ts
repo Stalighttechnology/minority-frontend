@@ -614,6 +614,10 @@ method: "GET" | "POST" = "GET")
       if (data.is_active !== undefined) params.append('is_active', data.is_active.toString());
       if (data.search) params.append('search', data.search);
       if ((data as any).department) params.append('department', (data as any).department);
+      const savedOrgId = typeof window !== 'undefined' ? (sessionStorage.getItem('selectedOrgId') || localStorage.getItem('selectedOrgId')) : null;
+      if (savedOrgId && savedOrgId !== 'null' && savedOrgId !== 'undefined') {
+        params.append('organization_id', savedOrgId);
+      }
       if (params.toString()) url += `?${params.toString()}`;
     }
 

@@ -261,6 +261,10 @@ const UsersManagement = ({ setError, toast }: UsersManagementProps) => {
       if (appliedSearch.trim()) {
         queryParams += `&search=${encodeURIComponent(appliedSearch.trim())}`;
       }
+      const savedOrgId = typeof window !== 'undefined' ? (sessionStorage.getItem('selectedOrgId') || localStorage.getItem('selectedOrgId')) : null;
+      if (savedOrgId && savedOrgId !== 'null' && savedOrgId !== 'undefined') {
+        queryParams += `&organization_id=${encodeURIComponent(savedOrgId)}`;
+      }
 
       const roleStr = roleFilter ? roleFilter.replace(/ /g, '_') : 'All_Roles';
       const deptStr = (departmentFilter && departmentFilter !== "All Branches") ? departmentFilter.replace(/ /g, '_') : 'All_Departments';
