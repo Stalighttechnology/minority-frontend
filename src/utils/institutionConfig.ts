@@ -90,7 +90,7 @@ export const translateTerminology = (content: any): any => {
     { pattern: /\bHODs\b/g, key: "hod" },
     { pattern: /\bActive branches\b/gi, key: "activeBranches" },
     { pattern: /\bAcross branches\b/gi, key: "acrossBranches" },
-    { pattern: /\bCoordinators\b/gi, key: "coordinators" },
+    { pattern: /(?<!academic\s)\bCoordinators\b/gi, key: "coordinators" },
     { pattern: /\bCollege Profile\b/gi, replacement: "School Profile" },
     { pattern: /\bCollege Details\b/gi, replacement: "School Details" },
     { pattern: /\bCollege Report Card\b/gi, replacement: "School Report Card" },

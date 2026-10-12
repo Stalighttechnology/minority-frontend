@@ -374,7 +374,7 @@ export const Navbar = ({
 
   return (
     <nav
-      className="w-full flex items-center justify-between px-3 sm:px-6 h-[60px] border-b transition-colors duration-200 notranslate bg-card border-border text-foreground shadow-sm"
+      className="relative z-30 w-full flex items-center justify-between px-3 sm:px-6 h-[60px] border-b transition-colors duration-200 notranslate bg-card border-border text-foreground shadow-sm"
     >
       {/* Left: Hamburger + User Welcome & Portal Badge */}
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">

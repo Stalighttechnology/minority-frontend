@@ -258,7 +258,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           }>
 
           {/* Single-Row Unified Navbar */}
-          <div className="z-10 shadow-sm w-full">
+          <div className="relative z-30 shadow-sm w-full">
             <Navbar
               role={role}
               user={user}
