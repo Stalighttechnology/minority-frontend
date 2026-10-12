@@ -48,7 +48,7 @@ import {
   CalendarCheck, Megaphone, ListTodo, RefreshCcw, FileQuestion, PieChart,
   Clock, LineChart, List, Activity, MonitorPlay, BookCopy, PenTool, DoorOpen,
   UtensilsCrossed, ClipboardSignature, Ticket, BusFront, Map, Navigation, History, Library, Repeat, FileCode, CheckCircle2, TrendingUp, ArrowLeftRight, Link, QrCode, Boxes,
-  ShoppingCart, Wrench, Layers, MapPin, Building2, Package, Gift
+  ShoppingCart, Wrench, Layers, MapPin, Building2, Package, Gift, Sparkles
 } from "lucide-react";
 import { useIsMobile } from "../../hooks/use-mobile";
 import {
@@ -488,6 +488,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
       "library-fines": <CreditCard size={20} />,
 
       "admission-dashboard": <LayoutDashboard size={20} />,
+      "smart-admission": <Sparkles size={20} />,
       "campus-builder": <LayoutDashboard size={20} />,
       "admission-enquiries": <Users size={20} />,
       "admission-applications": <FileText size={20} />,
@@ -556,6 +557,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
     ],
     principal: [
       { name: "Dashboard", page: "dashboard" },
+      { name: "Smart Admission (10-Step)", page: "smart-admission" },
       { name: "Workflow Configuration", page: "timetable-config" },
       { name: "Timetable", page: "timetable" },
       { name: getTerm("branches"), page: "branches" },
@@ -595,6 +597,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
     ],
     org_admin: [
       { name: "Dashboard", page: "dashboard" },
+      { name: "Smart Admission (10-Step)", page: "smart-admission" },
       { name: "Add Institution", page: "create-organization" },
       { name: getTerm("branches"), page: "branches" },
       { name: "Batches", page: "batches" },
@@ -626,6 +629,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
     ],
     admin: [
       { name: "Dashboard", page: "dashboard" },
+      { name: "Smart Admission (10-Step)", page: "smart-admission" },
       { name: "Workflow Configuration", page: "timetable-config" },
       { name: getTerm("branches"), page: "branches" },
       { name: "Batches", page: "batches" },
@@ -885,6 +889,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
     ],
     admission_manager: [
       { name: "Dashboard", page: "admission-dashboard" },
+      { name: "Smart Admission (10-Step)", page: "smart-admission" },
       { name: "Announcements", page: "announcements" },
       { name: "Courses", page: "admission-courses" },
       { name: "Enquiries", page: "admission-enquiries" },
@@ -906,6 +911,7 @@ const Sidebar = ({ role, setPage, activePage, logout, collapsed, toggleCollapse 
     ],
     counsellor: [
       { name: "Dashboard", page: "admission-dashboard" },
+      { name: "Smart Admission (10-Step)", page: "smart-admission" },
       { name: "School-Issued Items", page: "issued-items" },
       { name: "Sports & Wellness", page: "sports-wellness" },
       { name: "Announcements", page: "announcements" },

@@ -38,6 +38,7 @@ import CollegeDetailsPage from "../college_details/CollegeDetailsPage";
 import CollegeIssuedItemsPage from "../issued_items/CollegeIssuedItemsPage";
 import SportsWellnessPage from "../sports_wellness/SportsWellnessPage";
 import CreateOrganizationPage from "../org_admin/CreateOrganizationPage";
+import { SmartAdmissionModel } from "../admission/SmartAdmissionModel";
 
 interface OrgAdminDashboardProps {
   user: any;
@@ -73,6 +74,9 @@ const OrgAdminDashboard = ({ user, setPage }: OrgAdminDashboardProps) => {
     switch (activePage) {
       case "dashboard":
         return <AdminStats setError={setError} onNavigate={handlePageChange} />;
+
+      case "smart-admission":
+        return <SmartAdmissionModel userRole="org_admin" />;
 
       case "create-organization":
       case "add-institution":

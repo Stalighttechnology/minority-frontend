@@ -1,7 +1,9 @@
 import UpcomingMeetingsWidget from "../common/UpcomingMeetingsWidget";
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, FileText, CheckCircle, UserCheck, AlertCircle, BarChart2 } from 'lucide-react';
+import { Users, FileText, CheckCircle, UserCheck, AlertCircle, BarChart2, Sparkles, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { API_ENDPOINT } from '../../utils/config';
 import { fetchWithTokenRefresh } from '../../utils/authService';
 import { useAuth } from "../../context/AuthContext";
@@ -52,6 +54,7 @@ const BORDER_COLORS = [
 ];
 
 const AdmissionDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const { theme } = useTheme();
@@ -117,8 +120,42 @@ const AdmissionDashboard: React.FC = () => {
     ]
   };
 
+  const handleLaunchSmartAdmission = () => {
+    const basePath = role === 'counsellor' ? '/counsellor' : role === 'principal' ? '/admin' : role === 'org_admin' ? '/org-admin' : '/admission-manager';
+    navigate(`${basePath}/smart-admission`);
+  };
+
   return (
     <div className="space-y-6">
+      {/* 4. Smart Admission Model 10-Step Launch Banner */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/5 to-transparent border border-primary/25 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-primary/20 text-primary flex items-center justify-center shrink-0 shadow-sm">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-foreground">
+                Smart Admission Model (10-Step Pipeline)
+              </h2>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/20 text-primary uppercase tracking-wide">
+                Live Module
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Automated Merit Engine (70/20/10), Roster Quotas (75% Minority / 25% Gen), Seat Allotment & Hostel Bed Mapping.
+            </p>
+          </div>
+        </div>
+
+        <Button
+          onClick={handleLaunchSmartAdmission}
+          className="h-9 px-4 text-xs font-semibold rounded-xl bg-primary text-primary-foreground shadow-sm gap-1.5 shrink-0"
+        >
+          Open 10-Step Console <ArrowRight className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+
       {newLeads > 0 && (
         <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg flex items-start gap-4">
           <AlertCircle className="w-6 h-6 text-primary flex-shrink-0 mt-0.5" />

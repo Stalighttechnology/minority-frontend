@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import ExternalLinksPage from "../admin/ExternalLinksPage";
 import DashboardLayout from "../common/DashboardLayout";
 import AdmissionDashboard from "../admission/AdmissionDashboard";
+import { SmartAdmissionModel } from "../admission/SmartAdmissionModel";
 import LeadPipeline from "../admission/LeadPipeline";
 import Profile from "../common/Profile";
 import ApplyLeave from "../faculty/ApplyLeave";
@@ -46,6 +47,8 @@ const CounsellorDashboard = ({ user }: DashboardProps) => {
       case "admission-dashboard":
       case "":
         return <AdmissionDashboard />;
+      case "smart-admission":
+        return <SmartAdmissionModel userRole="counsellor" />;
       case "announcements":
         return <AnnouncementManagement />;
       case "issued-items":

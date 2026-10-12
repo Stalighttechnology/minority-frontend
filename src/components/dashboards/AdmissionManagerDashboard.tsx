@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import ExternalLinksPage from "../admin/ExternalLinksPage";
 import DashboardLayout from "../common/DashboardLayout";
 import AdmissionDashboard from "../admission/AdmissionDashboard";
+import { SmartAdmissionModel } from "../admission/SmartAdmissionModel";
 import CampusPageBuilder from "../admission/CampusPageBuilder";
 import LeadPipeline from "../admission/LeadPipeline";
 import AdmissionCourses from "../admission/AdmissionCourses";
@@ -55,6 +56,8 @@ const AdmissionManagerDashboard = ({ user }: DashboardProps) => {
       case "admission-dashboard":
       case "":
         return <AdmissionDashboard />;
+      case "smart-admission":
+        return <SmartAdmissionModel userRole="admission_manager" />;
       case "announcements":
         return <AnnouncementManagement />;
       case "campus-builder":

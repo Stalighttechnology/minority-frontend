@@ -11,6 +11,7 @@ import BulkUpload from "../admin/BulkUpload";
 import BranchesManagement from "../admin/BranchesManagement";
 import BatchManagement from "../admin/BatchManagement";
 import HODLeavesManagement from "../admin/HODLeavesManagement";
+import { SmartAdmissionModel } from "../admission/SmartAdmissionModel";
 import UsersManagement from "../admin/UsersManagement";
 import AdminProfile from "../admin/AdminProfile";
 import AdminQPApprovals from "../admin/AdminQPApprovals";
@@ -123,6 +124,9 @@ const AdminDashboard = ({ user, setPage }: AdminDashboardProps) => {
           <div className="space-y-6">
             <AdminStats setError={setError} onNavigate={handlePageChange} />
           </div>);
+
+      case "smart-admission":
+        return <SmartAdmissionModel userRole={user?.role || "principal"} />;
 
       case "college-details":
         return <CollegeDetailsPage userRole={user?.role || "principal"} />;
